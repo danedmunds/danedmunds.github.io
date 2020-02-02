@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 
   <title>Wait Time Scraping - Dan Edmunds</title>
-  <meta name="description" content="We recently had to visit the children&rsquo;s hospital here in Ottawa. We were lucky and were able to go early on a Sunday morning and didn&rsquo;t have to wait too long to be seen and treated. It made me curious what the wait time would have been had we not gone first thing in the morning. It also made me curious when the best time to go to the hospital would be as well as how wait times change of the week.">
+  <meta name="description" content="We recently had to visit the children&rsquo;s hospital here in Ottawa. We were lucky and were able to go early on a Sunday morning and didn&rsquo;t have to wait too long to be seen and treated. It made me curious what the wait time would have been had we not gone first thing in the morning. It also made me curious when the best time to go to the hospital would be as well as how wait times change during the week.">
   <meta name="author" content="Dan Edmunds"/><script type="application/ld+json">
 {
     "@context": "http://schema.org",
@@ -57,7 +57,7 @@
     "name" : "Dan Edmunds"
   },
   "headline": "Wait Time Scraping",
-  "description" : "We recently had to visit the children\x26rsquo;s hospital here in Ottawa. We were lucky and were able to go early on a Sunday morning and didn\x26rsquo;t have to wait too long to be seen and treated. It made me curious what the wait time would have been had we not gone first thing in the morning. It also made me curious when the best time to go to the hospital would be as well as how wait times change of the week.",
+  "description" : "We recently had to visit the children\x26rsquo;s hospital here in Ottawa. We were lucky and were able to go early on a Sunday morning and didn\x26rsquo;t have to wait too long to be seen and treated. It made me curious what the wait time would have been had we not gone first thing in the morning. It also made me curious when the best time to go to the hospital would be as well as how wait times change during the week.",
   "inLanguage" : "en",
   "wordCount":  989 ,
   "datePublished" : "2020-02-02T12:53:17",
@@ -79,7 +79,7 @@
 </script>
 
 <meta property="og:title" content="Wait Time Scraping" />
-<meta property="og:description" content="We recently had to visit the children&rsquo;s hospital here in Ottawa. We were lucky and were able to go early on a Sunday morning and didn&rsquo;t have to wait too long to be seen and treated. It made me curious what the wait time would have been had we not gone first thing in the morning. It also made me curious when the best time to go to the hospital would be as well as how wait times change of the week.">
+<meta property="og:description" content="We recently had to visit the children&rsquo;s hospital here in Ottawa. We were lucky and were able to go early on a Sunday morning and didn&rsquo;t have to wait too long to be seen and treated. It made me curious what the wait time would have been had we not gone first thing in the morning. It also made me curious when the best time to go to the hospital would be as well as how wait times change during the week.">
 <meta property="og:image" content="https://danedmunds.ca/img/avatar-icon.png" />
 <meta property="og:url" content="https://danedmunds.ca/post/wait-time-scraping/" />
 <meta property="og:type" content="website" />
@@ -273,7 +273,7 @@
   <div class="row">
     <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
       <article role="main" class="blog-post">
-        <p>We recently had to visit the children&rsquo;s hospital here in Ottawa. We were lucky and were able to go early on a Sunday morning and didn&rsquo;t have to wait too long to be seen and treated. It made me curious what the wait time would have been had we not gone first thing in the morning. It also made me curious when the best time to go to the hospital would be as well as how wait times change of the week.</p>
+        <p>We recently had to visit the children&rsquo;s hospital here in Ottawa. We were lucky and were able to go early on a Sunday morning and didn&rsquo;t have to wait too long to be seen and treated. It made me curious what the wait time would have been had we not gone first thing in the morning. It also made me curious when the best time to go to the hospital would be as well as how wait times change during the week.</p>
 <h1 id="tldr">TL;DR</h1>
 <p><em>I created a wait time scraper for the children&rsquo;s hospital in town which auto updates a Google Sheet every 15 minutes.</em></p>
 <p><em>See it <a href="https://docs.google.com/spreadsheets/d/1sfc95-dpw7GTgL71zygkJWoaA7JjNYmpKnPQIGHStvA/edit?usp=sharing">here!</a> Please feel free to save your own version or copy the data elsewhere to play with!</em></p>
@@ -307,12 +307,12 @@
 
 <span class="nb">echo</span> <span class="si">${</span><span class="nv">DATE</span><span class="si">}</span>,<span class="si">${</span><span class="nv">TIMES</span><span class="si">}</span>
 </code></pre></div><p><em>If you don&rsquo;t know about <a href="https://stedolan.github.io/jq/">jq it&rsquo;s definitely worth checking out</a>. It&rsquo;s a cool command line tool for manipulating JSON</em></p>
-<p>Now that I had a script to generate a CSV line I needed a way to run it every 15 minutes so I could grab the latest data. I knew cron jobs were a way to run periodic tasks and after some research a setup my own.</p>
+<p>Now that I had a script to generate a CSV line I needed a way to run it every 15 minutes so I could grab the latest data. I knew cron jobs were a way to run periodic tasks and after some research I setup my own.</p>
 <p>Run <code>crontab -e</code> to add or edit a cron job.</p>
 <p>I added the following job:</p>
 <div class="highlight"><pre class="chroma"><code class="language-sh" data-lang="sh">*/15 * * * * /home/me/gen-cheo-line.sh &gt;&gt; /home/me/cheo.csv
 </code></pre></div><p>Now every 15 minutes (on the 15s) I would scrape the wait times and append them to a csv file that I could import to Google Sheets or Excel.</p>
-<p>After spending a couple days coping and pasting the data to a spreadsheet I knew I needed to do something to auto update my sheet instead.</p>
+<p>After spending a couple days copying and pasting the data to a spreadsheet I knew I needed to do something to auto update my sheet instead.</p>
 <p>To do this I needed to figure out an automated way to update Google Sheets. I had hoped that they would have personal API keys but I couldn&rsquo;t find one. Instead I had to register an app for API access.</p>
 <p>Below are the instructions to obtain the credentials needed&hellip;</p>
 <p><strong>I would recommend creating a new Google account so that you don&rsquo;t accidentally grant access to anything you don&rsquo;t mean to. This is what I did.</strong></p>
@@ -324,7 +324,7 @@
 <li>Enable the Sheets API
 <img src="/images/enablesheets.png" alt="enable sheets"></li>
 <li>First you need to configure the consent screen for the app, create an external consent screen, add the <code>../auth/spreadsheets </code> scope</li>
-<li>Next create crendentials, you need to use OAuth Client ID
+<li>Next create credentials, you need to use OAuth Client ID
 <img src="/images/createcreds.png" alt="create credentials"></li>
 <li>For the type select &ldquo;Other&rdquo;
 <img src="/images/createoauth.png" alt="create oauth client"></li>
