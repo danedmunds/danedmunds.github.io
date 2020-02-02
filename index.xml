@@ -5,10 +5,19 @@
     <link>https://danedmunds.ca/</link>
     <description>Recent content on Dan Edmunds</description>
     <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Sat, 10 Nov 2018 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Sun, 02 Feb 2020 12:53:17 -0500</lastBuildDate>
     
 	<atom:link href="https://danedmunds.ca/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Wait Time Scraping</title>
+      <link>https://danedmunds.ca/post/wait-time-scraping/</link>
+      <pubDate>Sun, 02 Feb 2020 12:53:17 -0500</pubDate>
+      
+      <guid>https://danedmunds.ca/post/wait-time-scraping/</guid>
+      <description>We recently had to visit the children&amp;rsquo;s hospital here in Ottawa. We were lucky and were able to go early on a Sunday morning and didn&amp;rsquo;t have to wait too long to be seen and treated. It made me curious what the wait time would have been had we not gone first thing in the morning. It also made me curious when the best time to go to the hospital would be as well as how wait times change of the week.</description>
+    </item>
     
     <item>
       <title>First post!</title>
