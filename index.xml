@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Dan Edmunds</title>
@@ -34,7 +34,7 @@
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
       
       <guid>https://danedmunds.ca/page/projects/</guid>
-      <description> Swipe-a-Name  A Tinder clone for choosing baby names, created when we were expecting our daughter. Angular, Node, Mongo, Auth0 https://swipe.danedmunds.ca https://github.com/danedmunds/swipe-a-name  Hartiograf  A wedding website I made for my friends&amp;rsquo; wedding Angular, Node, Mongo https://hartiograf.danedmunds.ca https://github.com/danedmunds/hartiograf   </description>
+      <description> Swipe-a-Name  A Tinder clone for choosing baby names, created when we were expecting our daughter. Angular, Node, Mongo, Auth0 https://swipe.danedmunds.ca https://github.com/danedmunds/swipe-a-name   Hartiograf  A wedding website I made for my friends&amp;rsquo; wedding Angular, Node, Mongo https://hartiograf.danedmunds.ca https://github.com/danedmunds/hartiograf    </description>
     </item>
     
   </channel>
