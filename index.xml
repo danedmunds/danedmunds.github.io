@@ -4,47 +4,37 @@
     <title>Dan Edmunds</title>
     <link>https://danedmunds.ca/</link>
     <description>Recent content on Dan Edmunds</description>
-    <generator>Hugo -- gohugo.io</generator>
+    <generator>Hugo</generator>
+    <language>en</language>
     <lastBuildDate>Sun, 02 Feb 2020 12:53:17 -0500</lastBuildDate>
-    
-	<atom:link href="https://danedmunds.ca/index.xml" rel="self" type="application/rss+xml" />
-    
-    
+    <atom:link href="https://danedmunds.ca/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Wait Time Scraping</title>
       <link>https://danedmunds.ca/post/wait-time-scraping/</link>
       <pubDate>Sun, 02 Feb 2020 12:53:17 -0500</pubDate>
-      
       <guid>https://danedmunds.ca/post/wait-time-scraping/</guid>
       <description>We recently had to visit the children&amp;rsquo;s hospital here in Ottawa. We were lucky and were able to go early on a Sunday morning and didn&amp;rsquo;t have to wait too long to be seen and treated. It made me curious what the wait time would have been had we not gone first thing in the morning. It also made me curious when the best time to go to the hospital would be as well as how wait times change during the week.</description>
     </item>
-    
     <item>
       <title>First post!</title>
       <link>https://danedmunds.ca/post/2018-11-10-first-post/</link>
       <pubDate>Sat, 10 Nov 2018 00:00:00 +0000</pubDate>
-      
       <guid>https://danedmunds.ca/post/2018-11-10-first-post/</guid>
       <description>Trying out hugo to create my personal website!</description>
     </item>
-    
     <item>
       <title>About</title>
       <link>https://danedmunds.ca/page/about/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
       <guid>https://danedmunds.ca/page/about/</guid>
       <description>I&amp;rsquo;m a programmer from Ottawa, Ontario, Canada.</description>
     </item>
-    
     <item>
       <title>Projects</title>
       <link>https://danedmunds.ca/page/projects/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
       <guid>https://danedmunds.ca/page/projects/</guid>
-      <description> Swipe-a-Name  A Tinder clone for choosing baby names, created when we were expecting our daughter. Angular, Node, Mongo, Auth0 https://swipe.danedmunds.ca https://github.com/danedmunds/swipe-a-name   Hartiograf  A wedding website I made for my friends&amp;rsquo; wedding Angular, Node, Mongo https://hartiograf.danedmunds.ca https://github.com/danedmunds/hartiograf    </description>
+      <description> Swipe-a-Name A Tinder clone for choosing baby names, created when we were expecting our daughter. Angular, Node, Mongo, Auth0 https://github.com/danedmunds/swipe-a-name Hartiograf A wedding website I made for my friends&amp;rsquo; wedding Angular, Node, Mongo https://github.com/danedmunds/hartiograf </description>
     </item>
-    
   </channel>
 </rss>

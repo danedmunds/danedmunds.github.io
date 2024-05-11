@@ -1,45 +1,27 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
-  
   <url>
     <loc>https://danedmunds.ca/</loc>
     <lastmod>2020-02-02T12:53:17-05:00</lastmod>
-  </url>
-  
-  <url>
+  </url><url>
     <loc>https://danedmunds.ca/post/</loc>
     <lastmod>2020-02-02T12:53:17-05:00</lastmod>
-  </url>
-  
-  <url>
+  </url><url>
     <loc>https://danedmunds.ca/post/wait-time-scraping/</loc>
     <lastmod>2020-02-02T12:53:17-05:00</lastmod>
-  </url>
-  
-  <url>
+  </url><url>
     <loc>https://danedmunds.ca/post/2018-11-10-first-post/</loc>
     <lastmod>2018-11-10T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
+  </url><url>
     <loc>https://danedmunds.ca/page/about/</loc>
-  </url>
-  
-  <url>
+  </url><url>
     <loc>https://danedmunds.ca/categories/</loc>
-  </url>
-  
-  <url>
+  </url><url>
     <loc>https://danedmunds.ca/page/</loc>
-  </url>
-  
-  <url>
+  </url><url>
     <loc>https://danedmunds.ca/page/projects/</loc>
-  </url>
-  
-  <url>
+  </url><url>
     <loc>https://danedmunds.ca/tags/</loc>
   </url>
-  
 </urlset>

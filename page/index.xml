@@ -4,28 +4,22 @@
     <title>Pages on Dan Edmunds</title>
     <link>https://danedmunds.ca/page/</link>
     <description>Recent content in Pages on Dan Edmunds</description>
-    <generator>Hugo -- gohugo.io</generator>
-    
-	<atom:link href="https://danedmunds.ca/page/index.xml" rel="self" type="application/rss+xml" />
-    
-    
+    <generator>Hugo</generator>
+    <language>en</language>
+    <atom:link href="https://danedmunds.ca/page/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>About</title>
       <link>https://danedmunds.ca/page/about/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
       <guid>https://danedmunds.ca/page/about/</guid>
       <description>I&amp;rsquo;m a programmer from Ottawa, Ontario, Canada.</description>
     </item>
-    
     <item>
       <title>Projects</title>
       <link>https://danedmunds.ca/page/projects/</link>
       <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-      
       <guid>https://danedmunds.ca/page/projects/</guid>
-      <description> Swipe-a-Name  A Tinder clone for choosing baby names, created when we were expecting our daughter. Angular, Node, Mongo, Auth0 https://swipe.danedmunds.ca https://github.com/danedmunds/swipe-a-name   Hartiograf  A wedding website I made for my friends&amp;rsquo; wedding Angular, Node, Mongo https://hartiograf.danedmunds.ca https://github.com/danedmunds/hartiograf    </description>
+      <description> Swipe-a-Name A Tinder clone for choosing baby names, created when we were expecting our daughter. Angular, Node, Mongo, Auth0 https://github.com/danedmunds/swipe-a-name Hartiograf A wedding website I made for my friends&amp;rsquo; wedding Angular, Node, Mongo https://github.com/danedmunds/hartiograf </description>
     </item>
-    
   </channel>
 </rss>

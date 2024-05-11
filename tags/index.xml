@@ -4,10 +4,8 @@
     <title>Tags on Dan Edmunds</title>
     <link>https://danedmunds.ca/tags/</link>
     <description>Recent content in Tags on Dan Edmunds</description>
-    <generator>Hugo -- gohugo.io</generator>
-    
-	<atom:link href="https://danedmunds.ca/tags/index.xml" rel="self" type="application/rss+xml" />
-    
-    
+    <generator>Hugo</generator>
+    <language>en</language>
+    <atom:link href="https://danedmunds.ca/tags/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>
