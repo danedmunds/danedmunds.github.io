@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v5)</title>
+  <title>Bubble Pop! (v6)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -1082,10 +1082,27 @@
   // ---------------- Bubble Spawner ----------------
   let spawnTimer = 0;
   const BASE_SPAWN_INTERVAL = 0.8;
+  const MAX_BUBBLES = 15; // Maximum comfortable bubble count
+  const CROWDED_THRESHOLD = 12; // Start slowing down here
 
   function spawnLoop(dt) {
-    // Adjust spawn rate based on difficulty
-    const currentInterval = BASE_SPAWN_INTERVAL / difficultyLevel;
+    const bubbleCount = state.bubbles.length;
+    
+    // Calculate density penalty
+    let densityMultiplier = 1.0;
+    if (bubbleCount >= CROWDED_THRESHOLD) {
+      // Slow down spawning as we approach max bubbles
+      const overflow = (bubbleCount - CROWDED_THRESHOLD) / (MAX_BUBBLES - CROWDED_THRESHOLD);
+      densityMultiplier = 1.0 + (overflow * 3.0); // Up to 4x slower
+    }
+    
+    // Don't spawn at all if we're at or above max
+    if (bubbleCount >= MAX_BUBBLES) {
+      return;
+    }
+    
+    // Adjust spawn rate based on difficulty and density
+    const currentInterval = (BASE_SPAWN_INTERVAL / difficultyLevel) * densityMultiplier;
     
     spawnTimer += dt;
     if (spawnTimer >= currentInterval) {
@@ -1093,10 +1110,11 @@
       spawnBubble();
       
       // At higher difficulties, sometimes spawn multiple bubbles
-      if (difficultyLevel >= 2.0 && Math.random() < 0.3) {
+      // But respect density limits
+      if (difficultyLevel >= 2.0 && Math.random() < 0.3 && bubbleCount < CROWDED_THRESHOLD) {
         setTimeout(() => spawnBubble(), 100);
       }
-      if (difficultyLevel >= 2.5 && Math.random() < 0.2) {
+      if (difficultyLevel >= 2.5 && Math.random() < 0.2 && bubbleCount < CROWDED_THRESHOLD - 2) {
         setTimeout(() => spawnBubble(), 200);
       }
     }
