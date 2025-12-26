@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Bubble Pop! (v2)</title>
+  <style>
+    html, body {
+      margin: 0; height: 100%;
+      background: linear-gradient(180deg, #0a0520 0%, #1a1540 100%);
+      overflow: hidden;
+      touch-action: none;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    canvas { display:block; width:100vw; height:100vh; }
+
+    .score {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      
+      font: 900 48px/1 system-ui;
+      color: rgba(255,255,255,0.95);
+      text-shadow: 0 4px 12px rgba(0,0,0,0.5),
+                   0 0 20px rgba(140, 255, 210, 0.4);
+      user-select: none;
+      -webkit-user-select: none;
+      pointer-events: none;
+    }
+
+    .combo {
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      
+      font: 700 24px/1 system-ui;
+      color: rgba(255, 200, 100, 0.95);
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      user-select: none;
+      -webkit-user-select: none;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .combo.active { opacity: 1; }
+
+    .info {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      
+      font: 600 16px/1.3 system-ui;
+      color: rgba(255,255,255,0.7);
+      text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="score" class="score">0</div>
+  <div id="combo" class="combo"></div>
+  <div class="info">Pop the bubbles! ✨<br>Different bubbles = different explosions</div>
+  <canvas id="c"></canvas>
+
+<script>
+(() => {
+  // ---------------- Canvas setup ----------------
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d", { alpha: true });
+
+  function resize() {
+    const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(innerWidth * dpr);
+    canvas.height = Math.floor(innerHeight * dpr);
+    canvas.style.width = innerWidth + "px";
+    canvas.style.height = innerHeight + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  addEventListener("resize", resize, { passive: true });
+  resize();
+
+  // ---------------- Helpers ----------------
+  const rand = (a,b)=>a+Math.random()*(b-a);
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const lerp = (a,b,t)=>a+(b-a)*t;
+
+  // ---------------- Game State ----------------
+  let score = 0;
+  let combo = 0;
+  let comboTimer = 0;
+  const scoreEl = document.getElementById("score");
+  const comboEl = document.getElementById("combo");
+
+  const state = {
+    bubbles: [],
+    particles: [],
+  };
+
+  function updateScore(points) {
+    score += points;
+    scoreEl.textContent = score;
+    
+    combo++;
+    comboTimer = 2.0;
+    if (combo > 1) {
+      comboEl.textContent = `${combo}x COMBO!`;
+      comboEl.classList.add("active");
+    }
+  }
+
+  // ---------------- Sound (Web Audio) ----------------
+  let audioCtx = null;
+  let audioPrimed = false;
+
+  function ensureAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    audioPrimed = true;
+  }
+
+  function playTone(freq, dur=0.08, type="sine", vol=0.05) {
+    if (!audioPrimed) return;
+    const t0 = audioCtx.currentTime;
+
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+    o.connect(g);
+    g.connect(audioCtx.destination);
+
+    o.start(t0);
+    o.stop(t0 + dur + 0.02);
+  }
+
+  // Different pop sounds
+  function playPopSound(type) {
+    switch(type) {
+      case 0: // Soft pop
+        playTone(rand(300, 500), 0.08, "sine", 0.15);
+        break;
+      case 1: // Sharp pop
+        playTone(rand(600, 900), 0.05, "triangle", 0.18);
+        setTimeout(() => playTone(rand(400, 600), 0.04, "sine", 0.12), 20);
+        break;
+      case 2: // Deep boom
+        playTone(rand(120, 200), 0.12, "sawtooth", 0.20);
+        setTimeout(() => playTone(rand(80, 120), 0.08, "triangle", 0.15), 30);
+        break;
+      case 3: // Sparkly
+        playTone(rand(800, 1200), 0.04, "sine", 0.14);
+        setTimeout(() => playTone(rand(1000, 1600), 0.03, "sine", 0.10), 15);
+        setTimeout(() => playTone(rand(1200, 1800), 0.025, "sine", 0.08), 30);
+        break;
+      case 4: // Wobble
+        playTone(rand(250, 350), 0.10, "sine", 0.16);
+        setTimeout(() => playTone(rand(180, 280), 0.08, "sine", 0.14), 40);
+        break;
+      case 5: // Whistle
+        playTone(rand(1500, 2200), 0.06, "sine", 0.12);
+        break;
+      case 6: // Crackle
+        playTone(rand(400, 700), 0.03, "square", 0.14);
+        setTimeout(() => playTone(rand(300, 600), 0.025, "sawtooth", 0.12), 20);
+        break;
+    }
+  }
+
+  // ---------------- Bubble Types ----------------
+  const bubbleTypes = [
+    { 
+      name: "Standard", 
+      color: [180, 220], // hue range
+      size: [30, 50],
+      speed: [0.8, 1.4],
+      points: 10,
+      explosionType: 0,
+      weight: 40
+    },
+    { 
+      name: "Fast", 
+      color: [0, 40], // red-orange
+      size: [20, 35],
+      speed: [2.0, 3.0],
+      points: 20,
+      explosionType: 1,
+      weight: 20
+    },
+    { 
+      name: "Giant", 
+      color: [280, 320], // purple-pink
+      size: [60, 90],
+      speed: [0.4, 0.7],
+      points: 30,
+      explosionType: 2,
+      weight: 10
+    },
+    { 
+      name: "Sparkler", 
+      color: [40, 80], // yellow-gold
+      size: [25, 40],
+      speed: [1.0, 1.8],
+      points: 25,
+      explosionType: 3,
+      weight: 15
+    },
+    { 
+      name: "Wobbler", 
+      color: [120, 180], // green-cyan
+      size: [35, 55],
+      speed: [0.6, 1.2],
+      points: 15,
+      explosionType: 4,
+      weight: 20
+    },
+    { 
+      name: "Tiny", 
+      color: [260, 300], // purple-blue
+      size: [15, 25],
+      speed: [2.5, 4.0],
+      points: 35,
+      explosionType: 5,
+      weight: 8
+    },
+    { 
+      name: "Crackler", 
+      color: [320, 360], // pink-red
+      size: [40, 60],
+      speed: [1.2, 2.0],
+      points: 22,
+      explosionType: 6,
+      weight: 12
+    },
+  ];
+
+  function getRandomBubbleType() {
+    const totalWeight = bubbleTypes.reduce((sum, t) => sum + t.weight, 0);
+    let r = Math.random() * totalWeight;
+    for (const type of bubbleTypes) {
+      r -= type.weight;
+      if (r <= 0) return type;
+    }
+    return bubbleTypes[0];
+  }
+
+  // ---------------- Spawn Bubbles ----------------
+  function spawnBubble() {
+    const type = getRandomBubbleType();
+    const hue = rand(type.color[0], type.color[1]);
+    const r = rand(type.size[0], type.size[1]);
+    const speed = rand(type.speed[0], type.speed[1]);
+    
+    state.bubbles.push({
+      x: rand(r + 20, innerWidth - r - 20),
+      y: innerHeight + r + 10,
+      r,
+      vy: -speed,
+      vx: rand(-0.3, 0.3),
+      life: 1.0,
+      phase: rand(0, Math.PI*2),
+      wiggleSpeed: rand(0.5, 2.0),
+      wiggleAmp: rand(0.5, 2.0),
+      hue,
+      type,
+    });
+  }
+
+  // ---------------- Explosion Types ----------------
+  function explodeBubble(bubble) {
+    const x = bubble.x;
+    const y = bubble.y;
+    const r = bubble.r;
+    const type = bubble.type.explosionType;
+    const hue = bubble.hue;
+
+    playPopSound(type);
+
+    switch(type) {
+      case 0: // Standard burst - MORE PARTICLES, RAINBOW COLORS
+        for (let i=0; i<50; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(2, 9);
+          const layer = i % 3;
+          state.particles.push({
+            kind: "circle",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(2, 6),
+            life: rand(0.5, 1.2),
+            hue: hue + rand(-60, 60),
+            gravity: 0.8,
+            fadeType: layer, // 0=linear, 1=slow-start, 2=fast-start
+          });
+        }
+        // Add inner spray of different color
+        for (let i=0; i<20; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(1, 4);
+          state.particles.push({
+            kind: "circle",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(3, 8),
+            life: rand(0.6, 1.0),
+            hue: (hue + 180) % 360, // complementary color
+            gravity: 0.5,
+            fadeType: 1,
+          });
+        }
+        break;
+
+      case 1: // Sharp shards - MORE SHARDS, COLORFUL
+        for (let i=0; i<60; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(4, 14);
+          state.particles.push({
+            kind: "shard",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            w: rand(2, 5),
+            h: rand(8, 20),
+            rot: a,
+            vr: rand(-12, 12),
+            life: rand(0.4, 0.9),
+            hue: hue + rand(-90, 90),
+            gravity: 0.6,
+            fadeType: i % 2,
+          });
+        }
+        // Add sparkle particles
+        for (let i=0; i<30; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(6, 12);
+          state.particles.push({
+            kind: "circle",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(1, 3),
+            life: rand(0.3, 0.6),
+            hue: rand(0, 360),
+            gravity: 1.0,
+            fadeType: 2,
+          });
+        }
+        break;
+
+      case 2: // Giant slow rings - MORE RINGS AND COLORS
+        for (let i=0; i<5; i++) {
+          setTimeout(() => {
+            state.particles.push({
+              kind: "ring",
+              x, y,
+              r: r * 0.3,
+              growSpeed: rand(3, 6),
+              life: rand(0.8, 1.4),
+              hue: hue + i * 30,
+              fadeType: i % 3,
+            });
+          }, i * 60);
+        }
+        // Lots of colorful debris
+        for (let i=0; i<80; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(1, 5);
+          const colorShift = (i / 80) * 360; // full spectrum
+          state.particles.push({
+            kind: "circle",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(3, 10),
+            life: rand(0.6, 1.4),
+            hue: (hue + colorShift) % 360,
+            gravity: 0.3,
+            fadeType: Math.floor(i / 27),
+          });
+        }
+        // Add some glowing orbs
+        for (let i=0; i<15; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(2, 4);
+          state.particles.push({
+            kind: "glow",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(6, 12),
+            life: rand(0.8, 1.6),
+            hue: hue + rand(-60, 60),
+            gravity: 0.2,
+            fadeType: 1,
+          });
+        }
+        break;
+
+      case 3: // Sparkly stars - TONS OF SPARKLES
+        for (let i=0; i<100; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(3, 15);
+          const ring = Math.floor(i / 20); // 5 rings of different colors
+          state.particles.push({
+            kind: "star",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            size: rand(3, 10),
+            rot: rand(0, Math.PI*2),
+            vr: rand(-15, 15),
+            life: rand(0.5, 1.2),
+            hue: (hue + ring * 72) % 360, // golden angle distribution
+            gravity: 0.7,
+            twinkle: rand(0, Math.PI*2),
+            fadeType: ring % 3,
+          });
+        }
+        // Add tiny fast sparkles
+        for (let i=0; i<50; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(8, 18);
+          state.particles.push({
+            kind: "circle",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(1, 2),
+            life: rand(0.3, 0.6),
+            hue: rand(0, 360),
+            gravity: 1.2,
+            fadeType: 2,
+          });
+        }
+        break;
+
+      case 4: // Wobbling blobs - MORE VARIED BLOBS
+        for (let i=0; i<50; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(1.5, 7);
+          state.particles.push({
+            kind: "blob",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(4, 14),
+            life: rand(0.7, 1.5),
+            hue: hue + rand(-120, 120),
+            gravity: 0.7,
+            phase: rand(0, Math.PI*2),
+            wobbleSpeed: rand(3, 10),
+            fadeType: i % 3,
+          });
+        }
+        // Add contrasting color particles
+        for (let i=0; i<30; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(3, 8);
+          state.particles.push({
+            kind: "circle",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(2, 6),
+            life: rand(0.5, 1.0),
+            hue: (hue + 180) % 360,
+            gravity: 0.9,
+            fadeType: 1,
+          });
+        }
+        break;
+
+      case 5: // Tiny fast confetti - MASSIVE CONFETTI STORM
+        for (let i=0; i<120; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(8, 20);
+          state.particles.push({
+            kind: "confetti",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            w: rand(2, 5),
+            h: rand(6, 14),
+            rot: rand(0, Math.PI*2),
+            vr: rand(-25, 25),
+            life: rand(0.4, 1.0),
+            hue: rand(0, 360), // fully random colors
+            gravity: 1.4,
+            fadeType: i % 3,
+          });
+        }
+        // Add rainbow circles
+        for (let i=0; i<40; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(10, 18);
+          state.particles.push({
+            kind: "circle",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(1, 3),
+            life: rand(0.3, 0.7),
+            hue: (i / 40) * 360, // full spectrum
+            gravity: 1.6,
+            fadeType: 2,
+          });
+        }
+        break;
+
+      case 6: // Crackle with trails - MORE TRAILS, MORE COLORS
+        for (let i=0; i<70; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(4, 12);
+          state.particles.push({
+            kind: "trail",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(2, 6),
+            life: rand(0.6, 1.4),
+            hue: hue + rand(-90, 90),
+            gravity: 1.0,
+            trail: [{x, y}],
+            fadeType: i % 3,
+          });
+        }
+        // Add explosive shards
+        for (let i=0; i<40; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(6, 14);
+          state.particles.push({
+            kind: "shard",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            w: rand(3, 6),
+            h: rand(10, 18),
+            rot: a,
+            vr: rand(-15, 15),
+            life: rand(0.5, 1.0),
+            hue: (hue + i * 9) % 360, // rainbow spiral
+            gravity: 0.8,
+            fadeType: 1,
+          });
+        }
+        // Add glowing core particles
+        for (let i=0; i<20; i++) {
+          const a = rand(0, Math.PI*2);
+          const s = rand(2, 6);
+          state.particles.push({
+            kind: "glow",
+            x, y,
+            vx: Math.cos(a)*s,
+            vy: Math.sin(a)*s,
+            r: rand(4, 10),
+            life: rand(0.7, 1.3),
+            hue: hue + rand(-45, 45),
+            gravity: 0.5,
+            fadeType: 0,
+          });
+        }
+        break;
+    }
+  }
+
+  // ---------------- Input Handling ----------------
+  function handlePointerDown(e) {
+    if (!audioPrimed) {
+      ensureAudio();
+      playPopSound(0);
+    }
+
+    const x = e.clientX;
+    const y = e.clientY;
+
+    // Check for bubble hit
+    for (let i = state.bubbles.length - 1; i >= 0; i--) {
+      const b = state.bubbles[i];
+      const dx = x - b.x;
+      const dy = y - b.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < b.r) {
+        explodeBubble(b);
+        updateScore(b.type.points * Math.max(1, combo));
+        state.bubbles.splice(i, 1);
+        break;
+      }
+    }
+  }
+
+  canvas.addEventListener("pointerdown", handlePointerDown, { passive: true });
+
+  // ---------------- Update ----------------
+  function update(dt) {
+    // Update bubbles
+    for (let i = state.bubbles.length - 1; i >= 0; i--) {
+      const b = state.bubbles[i];
+      b.phase += dt * b.wiggleSpeed;
+      b.x += (b.vx + Math.sin(b.phase) * b.wiggleAmp) * 60 * dt;
+      b.y += b.vy * 60 * dt;
+
+      // Remove if off screen
+      if (b.y + b.r < -10) {
+        state.bubbles.splice(i, 1);
+        // Reset combo if bubble escapes
+        combo = 0;
+        comboEl.classList.remove("active");
+      }
+    }
+
+    // Update particles
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.life -= dt;
+
+      if (p.kind === "ring") {
+        p.r += p.growSpeed * 60 * dt;
+      } else {
+        p.x += p.vx * 60 * dt;
+        p.y += p.vy * 60 * dt;
+        
+        if (p.gravity !== undefined) {
+          p.vy += p.gravity * dt;
+        }
+
+        if (p.vr !== undefined) {
+          p.rot += p.vr * dt;
+        }
+
+        if (p.kind === "blob") {
+          p.phase += dt * p.wobbleSpeed;
+        }
+
+        if (p.kind === "star") {
+          p.twinkle += dt * 10;
+        }
+
+        if (p.kind === "trail") {
+          p.trail.push({x: p.x, y: p.y});
+          if (p.trail.length > 8) p.trail.shift();
+        }
+
+        // Drag
+        p.vx *= (1 - 0.8 * dt);
+        p.vy *= (1 - 0.8 * dt);
+      }
+
+      if (p.life <= 0) {
+        state.particles.splice(i, 1);
+      }
+    }
+
+    // Combo timer
+    if (comboTimer > 0) {
+      comboTimer -= dt;
+      if (comboTimer <= 0) {
+        combo = 0;
+        comboEl.classList.remove("active");
+      }
+    }
+  }
+
+  // ---------------- Draw ----------------
+  function draw() {
+    // Background
+    ctx.fillStyle = "rgba(10, 5, 32, 0.15)";
+    ctx.fillRect(0, 0, innerWidth, innerHeight);
+
+    // Draw particles
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    for (const p of state.particles) {
+      // Different fade types
+      let a;
+      const fadeType = p.fadeType || 0;
+      if (fadeType === 0) {
+        // Linear fade
+        a = clamp(p.life / 0.4, 0, 1);
+      } else if (fadeType === 1) {
+        // Slow start fade (stays bright longer)
+        const t = clamp(p.life / 0.5, 0, 1);
+        a = t * t;
+      } else {
+        // Fast start fade (quick fade out)
+        const t = clamp(p.life / 0.3, 0, 1);
+        a = Math.sqrt(t);
+      }
+
+      if (p.kind === "circle") {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = `hsl(${p.hue}, 85%, 65%)`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+      } 
+      else if (p.kind === "glow") {
+        // Glowing orb with radial gradient
+        ctx.globalAlpha = a * 0.8;
+        const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+        grd.addColorStop(0, `hsla(${p.hue}, 95%, 85%, 1)`);
+        grd.addColorStop(0.5, `hsla(${p.hue}, 90%, 70%, 0.6)`);
+        grd.addColorStop(1, `hsla(${p.hue}, 85%, 60%, 0)`);
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 1.5, 0, Math.PI*2);
+        ctx.fill();
+      }
+      else if (p.kind === "ring") {
+        ctx.globalAlpha = a * 0.6;
+        ctx.strokeStyle = `hsl(${p.hue}, 85%, 70%)`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.stroke();
+      }
+      else if (p.kind === "shard") {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = `hsl(${p.hue}, 90%, 70%)`;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+        ctx.restore();
+      }
+      else if (p.kind === "star") {
+        const tw = 0.7 + 0.3 * Math.sin(p.twinkle);
+        ctx.globalAlpha = a * tw;
+        ctx.fillStyle = `hsl(${p.hue}, 95%, 75%)`;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.beginPath();
+        for (let i=0; i<5; i++) {
+          const ang = (i/5) * Math.PI * 2;
+          const r = i % 2 === 0 ? p.size : p.size * 0.4;
+          ctx.lineTo(Math.cos(ang)*r, Math.sin(ang)*r);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      else if (p.kind === "blob") {
+        const wobble = Math.sin(p.phase) * 0.2 + 1;
+        ctx.globalAlpha = a;
+        ctx.fillStyle = `hsl(${p.hue}, 85%, 65%)`;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.scale(wobble, 1/wobble);
+        ctx.beginPath();
+        ctx.arc(0, 0, p.r, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+      else if (p.kind === "confetti") {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = `hsl(${p.hue}, 90%, 65%)`;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+        ctx.restore();
+      }
+      else if (p.kind === "trail") {
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = `hsl(${p.hue}, 90%, 70%)`;
+        ctx.lineWidth = p.r;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        for (let i=0; i<p.trail.length; i++) {
+          const pt = p.trail[i];
+          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        }
+        ctx.stroke();
+        
+        // Draw head
+        ctx.fillStyle = `hsl(${p.hue}, 95%, 75%)`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 1.2, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    // Draw bubbles
+    ctx.save();
+    for (const b of state.bubbles) {
+      const hue = b.hue;
+      
+      // Outer glow
+      ctx.globalAlpha = 0.3;
+      const glow = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, b.r * 1.3);
+      glow.addColorStop(0, `hsla(${hue}, 85%, 70%, 0.4)`);
+      glow.addColorStop(1, `hsla(${hue}, 85%, 70%, 0)`);
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r * 1.3, 0, Math.PI*2);
+      ctx.fill();
+
+      // Main bubble
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = `hsla(${hue}, 80%, 65%, 0.9)`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+      ctx.stroke();
+
+      // Highlight
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = `hsla(${hue}, 90%, 85%, 0.6)`;
+      ctx.beginPath();
+      ctx.arc(b.x - b.r*0.3, b.y - b.r*0.3, b.r*0.3, 0, Math.PI*2);
+      ctx.fill();
+
+      // Small highlight
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = `hsla(${hue}, 95%, 95%, 0.8)`;
+      ctx.beginPath();
+      ctx.arc(b.x - b.r*0.4, b.y - b.r*0.4, b.r*0.15, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ---------------- Bubble Spawner ----------------
+  let spawnTimer = 0;
+  const SPAWN_INTERVAL = 0.8;
+
+  function spawnLoop(dt) {
+    spawnTimer += dt;
+    if (spawnTimer >= SPAWN_INTERVAL) {
+      spawnTimer = 0;
+      spawnBubble();
+    }
+  }
+
+  // ---------------- Animation Loop ----------------
+  let last = performance.now();
+
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last)/1000);
+    last = now;
+
+    update(dt);
+    spawnLoop(dt);
+    draw();
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // Start with a few bubbles
+  for (let i=0; i<3; i++) {
+    setTimeout(() => spawnBubble(), i * 300);
+  }
+})();
+</script>
+</body>
+</html>
+
