@@ -300,15 +300,20 @@
   }
 
   function playPop(intensity=1) {
-    // short, soft “pop”
+    // short, soft "pop"
     const f = lerp(180, 420, clamp(intensity, 0, 1));
-    playTone(f, 0.06, "triangle", 0.045);
+    playTone(f, 0.06, "triangle", 0.13);
   }
   function playChime(intensity=1) {
     // two-note chime
     const base = lerp(420, 860, clamp(intensity, 0, 1));
-    playTone(base, 0.08, "sine", 0.04);
-    setTimeout(() => playTone(base*1.25, 0.07, "sine", 0.03), 25);
+    playTone(base, 0.08, "sine", 0.12);
+    setTimeout(() => playTone(base*1.25, 0.07, "sine", 0.09), 25);
+  }
+  function playBubbleBlip(intensity=1) {
+    // soft bubble blip
+    const f = lerp(280, 480, clamp(intensity, 0, 1));
+    playTone(f, 0.04, "sine", 0.06);
   }
   
 
@@ -342,6 +347,7 @@
       id: "sparklyGoo",
       name: "✨ Sparkly Goo",
       sliders: [
+        { key:"hueShift", label:"🎨 Color Hue", min:0, max:360, step:1, def:180, mod:0.25 },
         { key:"goo", label:"Goo Amount", min:0, max:1, step:0.01, def:1, mod:0.20 },
         { key:"sparkle", label:"Sparkle Amount", min:0, max:1, step:0.01, def:1, mod:0.22 },
         { key:"size", label:"Blob Size", min:10, max:44, step:1, def:24, mod:0.12 },
@@ -354,7 +360,7 @@
         if (p("goo") > 0.01) dropBlob(x,y, meta, clamp(speed/14, 0.6, 2.0) * p("goo"));
         if (p("sparkle") > 0.01 && speed > 1.5) {
           burstSparkles(x,y, Math.floor(clamp(speed/2, 2, 14) * p("sparkle")));
-          if (speed > 10) playTone(lerp(320, 760, clamp(speed/28,0,1)), 0.04, "sine", 0.02);
+          if (speed > 10) playTone(lerp(320, 760, clamp(speed/28,0,1)), 0.04, "sine", 0.06);
         }
       },
       drawOverlay(){ drawTrails(0.16); drawGoo(p("blur")); },
@@ -363,6 +369,7 @@
       id: "starBursts",
       name: "⭐ Star Bursts",
       sliders: [
+        { key:"hueShift", label:"🎨 Color Hue", min:0, max:360, step:1, def:180, mod:0.25 },
         { key:"rate", label:"Burst Rate", min:0.1, max:2.0, step:0.05, def:1.0, mod:0.18 },
         { key:"points", label:"Star Points", min:4, max:10, step:1, def:5, mod:0.10 },
         { key:"radius", label:"Star Size", min:10, max:70, step:1, def:28, mod:0.15 },
@@ -376,7 +383,7 @@
         while (meta.emitAcc > 1) {
           meta.emitAcc -= 1;
           spawnBurstStar(x,y, 0.75);
-          if (p("glitter") > 0.2) playTone(rand(520, 980), 0.03, "triangle", 0.02);
+          if (p("glitter") > 0.2) playTone(rand(520, 980), 0.03, "triangle", 0.06);
         }
         if (p("glitter") > 0.01 && meta.speed > 2) burstSparkles(x,y, Math.floor(clamp(meta.speed, 0, 12) * p("glitter")));
       },
@@ -386,6 +393,7 @@
       id: "fireworks",
       name: "🎆 Fireworks Paint",
       sliders: [
+        { key:"hueShift", label:"🎨 Color Hue", min:0, max:360, step:1, def:180, mod:0.25 },
         { key:"pop", label:"Pop Size", min:10, max:90, step:1, def:48, mod:0.18 },
         { key:"count", label:"Particles", min:10, max:90, step:1, def:34, mod:0.12 },
         { key:"spread", label:"Spread", min:0.3, max:3.0, step:0.05, def:1.2, mod:0.16 },
@@ -408,20 +416,21 @@
       id: "bubbles",
       name: "🫧 Bubbles & Pops",
       sliders: [
+        { key:"hueShift", label:"🎨 Color Hue", min:0, max:360, step:1, def:180, mod:0.25 },
         { key:"bubbleSize", label:"Bubble Size", min:10, max:80, step:1, def:34, mod:0.14 },
         { key:"rise", label:"Rise Speed", min:0.2, max:2.4, step:0.05, def:1.0, mod:0.16 },
         { key:"amount", label:"Bubble Amount", min:0.1, max:2.2, step:0.05, def:1.0, mod:0.18 },
         { key:"popSpark", label:"Pop Sparkle", min:0, max:1, step:0.01, def:0.6, mod:0.22 },
         { key:"wiggle", label:"Wiggle", min:0, max:1, step:0.01, def:0.35, mod:0.18 },
       ],
-      onDown(x,y){ spawnBubble(x,y, 1.2); playTone(260, 0.05, "sine", 0.03); },
+      onDown(x,y){ spawnBubble(x,y, 1.2); playTone(260, 0.05, "sine", 0.09); },
       onMove(x,y,meta){
         const amt = p("amount");
         meta.bAcc = (meta.bAcc || 0) + meta.dist * 0.02 * amt;
         while (meta.bAcc > 1) {
           meta.bAcc -= 1;
           spawnBubble(x,y, 1.0);
-          if (Math.random() < 0.15) playTone(rand(220, 340), 0.03, "sine", 0.015);
+          if (Math.random() < 0.15) playTone(rand(220, 340), 0.03, "sine", 0.045);
         }
       },
       drawOverlay(){ drawBubbles(); }
@@ -430,6 +439,7 @@
       id: "ribbon",
       name: "🌈 Rainbow Ribbon",
       sliders: [
+        { key:"hueShift", label:"🎨 Color Hue", min:0, max:360, step:1, def:180, mod:0.25 },
         { key:"width", label:"Ribbon Width", min:6, max:44, step:1, def:20, mod:0.15 },
         { key:"spring", label:"Springiness", min:0.02, max:0.25, step:0.01, def:0.10, mod:0.14 },
         { key:"smooth", label:"Smoothness", min:0.05, max:0.55, step:0.01, def:0.22, mod:0.14 },
@@ -441,7 +451,7 @@
         ensureRibbon(meta.pointerId, x, y);
         if (p("glitter") > 0.01 && meta.speed > 2) {
           burstSparkles(x,y, Math.floor(clamp(meta.speed/2, 2, 10) * p("glitter")));
-          if (meta.speed > 9) playTone(rand(520, 1000), 0.025, "sine", 0.015);
+          if (meta.speed > 9) playTone(rand(520, 1000), 0.025, "sine", 0.045);
         }
       },
       drawOverlay(){ drawRibbons(); }
@@ -570,7 +580,8 @@
     pointers.set(e.pointerId, { x, y });
     perPointerMeta.set(e.pointerId, { pointerId: e.pointerId });
 
-    state.trails.set(e.pointerId, [{ x, y, t: performance.now() }]);
+    const hueShift = p("hueShift") || 0;
+    state.trails.set(e.pointerId, [{ x, y, t: performance.now(), hue: (rand(0, 360) + hueShift) % 360 }]);
 
     callEffect("onDown", x, y, e.pointerId, 0, 0, 0);
     e.preventDefault();
@@ -596,11 +607,12 @@
       const d = Math.hypot(dx, dy);
       const steps = Math.floor(d / 10);
       const now = performance.now();
+      const hue = tr[0].hue || 200;
       for (let i=1;i<=steps;i++) {
         const tt = i/(steps+1);
-        tr.push({ x: last.x + dx*tt, y: last.y + dy*tt, t: now });
+        tr.push({ x: last.x + dx*tt, y: last.y + dy*tt, t: now, hue });
       }
-      tr.push({ x, y, t: now });
+      tr.push({ x, y, t: now, hue });
       while (tr.length > 42) tr.shift();
     }
 
@@ -636,6 +648,7 @@
 
   // ---------------- Visual systems ----------------
   function burstSparkles(x,y,count) {
+    const hueShift = p("hueShift") || 0;
     for (let i=0;i<count;i++) {
       const a = rand(0, Math.PI*2);
       const s = rand(0.6, 4.2);
@@ -644,13 +657,14 @@
         x,y, vx:Math.cos(a)*s, vy:Math.sin(a)*s,
         r:rand(1.2, 3.2),
         life:rand(0.25, 0.9),
-        hue:rand(40, 70),
+        hue:(rand(0, 360) + hueShift) % 360,
         tw:rand(0, Math.PI*2),
       });
     }
   }
 
   function burstStars(x,y,count,scale=1) {
+    const hueShift = p("hueShift") || 0;
     for (let i=0;i<count;i++) {
       const a = rand(0, Math.PI*2);
       const s = rand(0.8, 4.6) * scale;
@@ -661,20 +675,21 @@
         rot:rand(0, Math.PI*2),
         vr:rand(-3, 3),
         life:rand(0.35, 1.1),
-        hue:rand(40, 80),
+        hue:(rand(0, 360) + hueShift) % 360,
       });
     }
   }
 
   function dropBlob(x,y,meta,strength=1) {
     const base = effectParams[activeEffectId]?.size ?? 24;
+    const hueShift = p("hueShift") || 0;
     state.blobs.push({
       x,y,
       r:rand(base*0.55, base*1.15) * strength,
       vx:rand(-0.9, 0.9) * strength,
       vy:rand(-0.9, 0.9) * strength,
       life:rand(0.7, 1.5),
-      hue:rand(260, 320),
+      hue:(rand(0, 360) + hueShift) % 360,
     });
     if ((meta?.speed ?? 0) > 12) burstStars(x,y, 2, 0.7);
   }
@@ -701,6 +716,7 @@
     const points = Math.round(p("points"));
     const radius = p("radius") * scale;
     const wobble = p("wobble");
+    const hueShift = p("hueShift") || 0;
     state.particles.push({
       kind:"bigStar",
       x,y,
@@ -711,7 +727,7 @@
       rot:rand(0, Math.PI*2),
       vr:rand(-1.5, 1.5),
       life:rand(0.45, 1.3),
-      hue:rand(35, 70),
+      hue:(rand(0, 360) + hueShift) % 360,
     });
   }
 
@@ -719,6 +735,7 @@
     const count = Math.round(p("count"));
     const spread = p("spread");
     const popSize = p("pop") * scale;
+    const hueShift = p("hueShift") || 0;
     for (let i=0;i<count;i++) {
       const a = rand(0, Math.PI*2);
       const sp = rand(0.8, 6.0) * spread;
@@ -729,7 +746,7 @@
         vy:Math.sin(a)*sp,
         r:rand(1.2, 3.0) * (popSize/48),
         life:rand(0.35, 1.0),
-        hue:rand(180, 330),
+        hue:(rand(0, 360) + hueShift) % 360,
         glow:p("glow"),
       });
     }
@@ -738,6 +755,7 @@
 
 function spawnBubble(x,y,scale=1) {
   const sz = p("bubbleSize") * scale;
+  const hueShift = p("hueShift") || 0;
   state.bubbles.push({
     x,y,
     r:rand(sz*0.7, sz*1.1),
@@ -745,6 +763,7 @@ function spawnBubble(x,y,scale=1) {
     vx:rand(-0.4, 0.4),
     life:rand(1.2, 2.6),
     phase:rand(0, Math.PI*2),
+    hue:(rand(160, 220) + hueShift) % 360,
   });
 
   // NEW: bubble creation sound
@@ -755,15 +774,16 @@ function spawnBubble(x,y,scale=1) {
     ctx.save();
     for (const b of state.bubbles) {
       const a = clamp(b.life/0.6, 0, 1) * 0.7;
+      const hue = b.hue || 200;
       ctx.globalAlpha = a;
-      ctx.strokeStyle = "rgba(200,240,255,0.55)";
+      ctx.strokeStyle = `hsla(${hue}, 75%, 70%, 0.7)`;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
       ctx.stroke();
 
       ctx.globalAlpha = a * 0.5;
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillStyle = `hsla(${hue}, 85%, 85%, 0.45)`;
       ctx.beginPath();
       ctx.arc(b.x - b.r*0.25, b.y - b.r*0.25, b.r*0.25, 0, Math.PI*2);
       ctx.fill();
@@ -774,11 +794,12 @@ function spawnBubble(x,y,scale=1) {
 
   function ensureRibbon(pointerId, x, y) {
     if (!state.ribbons.has(pointerId)) {
+      const hueShift = p("hueShift") || 0;
       state.ribbons.set(pointerId, {
         x,y, vx:0, vy:0,
         targetX:x, targetY:y,
         points:[{x,y,a:1}],
-        hue:rand(0,360),
+        hue:(rand(0,360) + hueShift) % 360,
       });
     }
     const r = state.ribbons.get(pointerId);
@@ -839,9 +860,11 @@ function spawnBubble(x,y,scale=1) {
     ctx.fillStyle = "#050510";
     ctx.fillRect(0, 0, innerWidth, innerHeight);
 
+    const t = performance.now() * 0.0001;
+    const hue = (Math.sin(t) * 60 + 240) % 360;
     const g = ctx.createRadialGradient(innerWidth*0.5, innerHeight*0.35, 30,
                                        innerWidth*0.5, innerHeight*0.35, Math.max(innerWidth, innerHeight)*0.7);
-    g.addColorStop(0, "rgba(180,120,255,0.10)");
+    g.addColorStop(0, `hsla(${hue}, 70%, 60%, 0.12)`);
     g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0,0,innerWidth,innerHeight);
@@ -865,10 +888,11 @@ function spawnBubble(x,y,scale=1) {
       const a = clamp(1 - age / 900, 0, 1);
       if (a <= 0) continue;
 
+      const hue = pts[0].hue || 200;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.lineWidth = 18;
-      ctx.strokeStyle = `rgba(120, 220, 255, ${alpha * a})`;
+      ctx.strokeStyle = `hsla(${hue}, 85%, 65%, ${alpha * a})`;
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
