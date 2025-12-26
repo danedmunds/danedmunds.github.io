@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v2)</title>
+  <title>Bubble Pop! (v3)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -296,28 +296,37 @@
           const a = rand(0, Math.PI*2);
           const s = rand(2, 9);
           const layer = i % 3;
+          // Mix circles and stars
+          const kind = i % 4 === 0 ? "star" : "circle";
           state.particles.push({
-            kind: "circle",
+            kind,
             x, y,
             vx: Math.cos(a)*s,
             vy: Math.sin(a)*s,
-            r: rand(2, 6),
+            r: kind === "circle" ? rand(2, 6) : undefined,
+            size: kind === "star" ? rand(3, 7) : undefined,
+            rot: kind === "star" ? rand(0, Math.PI*2) : undefined,
+            vr: kind === "star" ? rand(-10, 10) : undefined,
+            twinkle: kind === "star" ? rand(0, Math.PI*2) : undefined,
             life: rand(0.5, 1.2),
             hue: hue + rand(-60, 60),
             gravity: 0.8,
             fadeType: layer, // 0=linear, 1=slow-start, 2=fast-start
           });
         }
-        // Add inner spray of different color
+        // Add inner spray of different color with triangles
         for (let i=0; i<20; i++) {
           const a = rand(0, Math.PI*2);
           const s = rand(1, 4);
+          const kind = i % 3 === 0 ? "triangle" : "circle";
           state.particles.push({
-            kind: "circle",
+            kind,
             x, y,
             vx: Math.cos(a)*s,
             vy: Math.sin(a)*s,
             r: rand(3, 8),
+            rot: kind === "triangle" ? rand(0, Math.PI*2) : undefined,
+            vr: kind === "triangle" ? rand(-8, 8) : undefined,
             life: rand(0.6, 1.0),
             hue: (hue + 180) % 360, // complementary color
             gravity: 0.5,
@@ -326,7 +335,7 @@
         }
         break;
 
-      case 1: // Sharp shards - MORE SHARDS, COLORFUL
+      case 1: // Sharp shards - MORE SHARDS, COLORFUL, WITH STARS
         for (let i=0; i<60; i++) {
           const a = rand(0, Math.PI*2);
           const s = rand(4, 14);
@@ -345,16 +354,20 @@
             fadeType: i % 2,
           });
         }
-        // Add sparkle particles
+        // Add stars and diamonds
         for (let i=0; i<30; i++) {
           const a = rand(0, Math.PI*2);
           const s = rand(6, 12);
+          const kind = i % 2 === 0 ? "star" : "diamond";
           state.particles.push({
-            kind: "circle",
+            kind,
             x, y,
             vx: Math.cos(a)*s,
             vy: Math.sin(a)*s,
-            r: rand(1, 3),
+            size: rand(4, 8),
+            rot: rand(0, Math.PI*2),
+            vr: rand(-15, 15),
+            twinkle: kind === "star" ? rand(0, Math.PI*2) : undefined,
             life: rand(0.3, 0.6),
             hue: rand(0, 360),
             gravity: 1.0,
@@ -377,17 +390,28 @@
             });
           }, i * 60);
         }
-        // Lots of colorful debris
+        // Lots of colorful debris with varied shapes
         for (let i=0; i<80; i++) {
           const a = rand(0, Math.PI*2);
           const s = rand(1, 5);
           const colorShift = (i / 80) * 360; // full spectrum
+          const shapeType = Math.floor(i / 20); // 4 shape types
+          let kind;
+          if (shapeType === 0) kind = "circle";
+          else if (shapeType === 1) kind = "star";
+          else if (shapeType === 2) kind = "triangle";
+          else kind = "diamond";
+          
           state.particles.push({
-            kind: "circle",
+            kind,
             x, y,
             vx: Math.cos(a)*s,
             vy: Math.sin(a)*s,
-            r: rand(3, 10),
+            r: kind === "circle" ? rand(3, 10) : undefined,
+            size: kind !== "circle" ? rand(4, 9) : undefined,
+            rot: kind !== "circle" ? rand(0, Math.PI*2) : undefined,
+            vr: kind !== "circle" ? rand(-10, 10) : undefined,
+            twinkle: kind === "star" ? rand(0, Math.PI*2) : undefined,
             life: rand(0.6, 1.4),
             hue: (hue + colorShift) % 360,
             gravity: 0.3,
@@ -468,16 +492,21 @@
             fadeType: i % 3,
           });
         }
-        // Add contrasting color particles
+        // Add contrasting color particles with varied shapes
         for (let i=0; i<30; i++) {
           const a = rand(0, Math.PI*2);
           const s = rand(3, 8);
+          const kind = i % 3 === 0 ? "star" : (i % 3 === 1 ? "diamond" : "circle");
           state.particles.push({
-            kind: "circle",
+            kind,
             x, y,
             vx: Math.cos(a)*s,
             vy: Math.sin(a)*s,
-            r: rand(2, 6),
+            r: kind === "circle" ? rand(2, 6) : undefined,
+            size: kind !== "circle" ? rand(3, 7) : undefined,
+            rot: kind !== "circle" ? rand(0, Math.PI*2) : undefined,
+            vr: kind !== "circle" ? rand(-12, 12) : undefined,
+            twinkle: kind === "star" ? rand(0, Math.PI*2) : undefined,
             life: rand(0.5, 1.0),
             hue: (hue + 180) % 360,
             gravity: 0.9,
@@ -505,16 +534,21 @@
             fadeType: i % 3,
           });
         }
-        // Add rainbow circles
+        // Add rainbow circles and other shapes
         for (let i=0; i<40; i++) {
           const a = rand(0, Math.PI*2);
           const s = rand(10, 18);
+          const kind = i % 4 === 0 ? "star" : (i % 4 === 1 ? "diamond" : (i % 4 === 2 ? "triangle" : "circle"));
           state.particles.push({
-            kind: "circle",
+            kind,
             x, y,
             vx: Math.cos(a)*s,
             vy: Math.sin(a)*s,
-            r: rand(1, 3),
+            r: kind === "circle" ? rand(1, 3) : undefined,
+            size: kind !== "circle" ? rand(2, 5) : undefined,
+            rot: kind !== "circle" ? rand(0, Math.PI*2) : undefined,
+            vr: kind !== "circle" ? rand(-20, 20) : undefined,
+            twinkle: kind === "star" ? rand(0, Math.PI*2) : undefined,
             life: rand(0.3, 0.7),
             hue: (i / 40) * 360, // full spectrum
             gravity: 1.6,
@@ -741,18 +775,49 @@
         ctx.restore();
       }
       else if (p.kind === "star") {
-        const tw = 0.7 + 0.3 * Math.sin(p.twinkle);
+        const tw = p.twinkle !== undefined ? (0.7 + 0.3 * Math.sin(p.twinkle)) : 1;
         ctx.globalAlpha = a * tw;
         ctx.fillStyle = `hsl(${p.hue}, 95%, 75%)`;
         ctx.save();
         ctx.translate(p.x, p.y);
-        ctx.rotate(p.rot);
+        ctx.rotate(p.rot || 0);
         ctx.beginPath();
         for (let i=0; i<5; i++) {
           const ang = (i/5) * Math.PI * 2;
           const r = i % 2 === 0 ? p.size : p.size * 0.4;
           ctx.lineTo(Math.cos(ang)*r, Math.sin(ang)*r);
         }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      else if (p.kind === "triangle") {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = `hsl(${p.hue}, 90%, 70%)`;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot || 0);
+        ctx.beginPath();
+        const s = p.r || p.size;
+        ctx.moveTo(0, -s);
+        ctx.lineTo(s * 0.866, s * 0.5);
+        ctx.lineTo(-s * 0.866, s * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      else if (p.kind === "diamond") {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = `hsl(${p.hue}, 92%, 72%)`;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot || 0);
+        ctx.beginPath();
+        const s = p.size || p.r;
+        ctx.moveTo(0, -s);
+        ctx.lineTo(s * 0.6, 0);
+        ctx.lineTo(0, s);
+        ctx.lineTo(-s * 0.6, 0);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
