@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v3)</title>
+  <title>Bubble Pop! (v4)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -97,6 +97,11 @@
   let score = 0;
   let combo = 0;
   let comboTimer = 0;
+  let bubblesPopped = 0;
+  let bubblesEscaped = 0;
+  let performanceCheckTimer = 0;
+  let difficultyLevel = 1.0; // Multiplier for spawn rate
+  
   const scoreEl = document.getElementById("score");
   const comboEl = document.getElementById("combo");
 
@@ -109,11 +114,54 @@
     score += points;
     scoreEl.textContent = score;
     
+    bubblesPopped++;
+    
     combo++;
     comboTimer = 2.0;
     if (combo > 1) {
       comboEl.textContent = `${combo}x COMBO!`;
       comboEl.classList.add("active");
+    }
+  }
+
+  function bubbleEscaped() {
+    bubblesEscaped++;
+    combo = 0;
+    comboEl.classList.remove("active");
+  }
+
+  // Dynamic difficulty adjustment
+  function adjustDifficulty(dt) {
+    performanceCheckTimer += dt;
+    
+    // Check performance every 5 seconds
+    if (performanceCheckTimer >= 5.0) {
+      performanceCheckTimer = 0;
+      
+      const total = bubblesPopped + bubblesEscaped;
+      if (total > 0) {
+        const successRate = bubblesPopped / total;
+        
+        // If popping 90%+ of bubbles, increase difficulty
+        if (successRate >= 0.9 && difficultyLevel < 3.0) {
+          difficultyLevel += 0.2;
+        }
+        // If missing 50%+ of bubbles, decrease difficulty
+        else if (successRate < 0.5 && difficultyLevel > 0.5) {
+          difficultyLevel -= 0.15;
+        }
+        // Moderate success, slight increase
+        else if (successRate >= 0.75 && difficultyLevel < 2.5) {
+          difficultyLevel += 0.1;
+        }
+        
+        // Clamp difficulty
+        difficultyLevel = clamp(difficultyLevel, 0.5, 3.0);
+      }
+      
+      // Reset counters
+      bubblesPopped = 0;
+      bubblesEscaped = 0;
     }
   }
 
@@ -653,9 +701,7 @@
       // Remove if off screen
       if (b.y + b.r < -10) {
         state.bubbles.splice(i, 1);
-        // Reset combo if bubble escapes
-        combo = 0;
-        comboEl.classList.remove("active");
+        bubbleEscaped();
       }
     }
 
@@ -908,13 +954,24 @@
 
   // ---------------- Bubble Spawner ----------------
   let spawnTimer = 0;
-  const SPAWN_INTERVAL = 0.8;
+  const BASE_SPAWN_INTERVAL = 0.8;
 
   function spawnLoop(dt) {
+    // Adjust spawn rate based on difficulty
+    const currentInterval = BASE_SPAWN_INTERVAL / difficultyLevel;
+    
     spawnTimer += dt;
-    if (spawnTimer >= SPAWN_INTERVAL) {
+    if (spawnTimer >= currentInterval) {
       spawnTimer = 0;
       spawnBubble();
+      
+      // At higher difficulties, sometimes spawn multiple bubbles
+      if (difficultyLevel >= 2.0 && Math.random() < 0.3) {
+        setTimeout(() => spawnBubble(), 100);
+      }
+      if (difficultyLevel >= 2.5 && Math.random() < 0.2) {
+        setTimeout(() => spawnBubble(), 200);
+      }
     }
   }
 
@@ -925,6 +982,7 @@
     const dt = Math.min(0.033, (now - last)/1000);
     last = now;
 
+    adjustDifficulty(dt);
     update(dt);
     spawnLoop(dt);
     draw();
