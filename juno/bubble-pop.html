@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v7)</title>
+  <title>Bubble Pop! (v13)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -108,11 +108,12 @@
   const state = {
     bubbles: [],
     particles: [],
-    dragTrails: [], // Trails from dragging
+    chainDisplays: [], // Active chain reaction displays
   };
+  
+  let activeChains = new Map(); // chainId -> { count, displayIndex, originX, originY }
 
   function updateScore(points) {
-    const oldScore = score;
     score += points;
     scoreEl.textContent = score;
     
@@ -124,78 +125,6 @@
       comboEl.textContent = `${combo}x COMBO!`;
       comboEl.classList.add("active");
     }
-    
-    // Celebratory confetti on milestones
-    checkMilestones(oldScore, score, combo);
-  }
-
-  // Confetti celebration effects
-  function spawnConfetti(x, y, amount, spreadX = 300, spreadY = 400) {
-    for (let i = 0; i < amount; i++) {
-      const angle = rand(-Math.PI/3, -Math.PI*2/3); // Upward spray
-      const speed = rand(8, 18);
-      const shapeType = Math.floor(Math.random() * 4);
-      let kind;
-      if (shapeType === 0) kind = "confetti";
-      else if (shapeType === 1) kind = "star";
-      else if (shapeType === 2) kind = "circle";
-      else kind = "diamond";
-      
-      state.particles.push({
-        kind,
-        x: x + rand(-spreadX/2, spreadX/2),
-        y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        w: kind === "confetti" ? rand(3, 6) : undefined,
-        h: kind === "confetti" ? rand(8, 14) : undefined,
-        r: kind === "circle" ? rand(3, 7) : undefined,
-        size: (kind === "star" || kind === "diamond") ? rand(4, 9) : undefined,
-        rot: rand(0, Math.PI*2),
-        vr: rand(-20, 20),
-        twinkle: kind === "star" ? rand(0, Math.PI*2) : undefined,
-        life: rand(1.2, 2.0),
-        hue: rand(0, 360),
-        gravity: 1.4,
-        fadeType: Math.floor(Math.random() * 3),
-      });
-    }
-  }
-
-  function checkMilestones(oldScore, newScore, currentCombo) {
-    const milestones = [100, 250, 500, 1000, 2000, 5000, 10000];
-    
-    // Score milestone confetti
-    for (const milestone of milestones) {
-      if (oldScore < milestone && newScore >= milestone) {
-        // Big celebration at screen center
-        spawnConfetti(innerWidth / 2, innerHeight * 0.3, 80, 400, 300);
-        playCheer(1.0);
-        break;
-      }
-    }
-    
-    // Combo milestone confetti
-    if (currentCombo === 5 || currentCombo === 10 || currentCombo === 15 || 
-        currentCombo === 20 || currentCombo === 30 || currentCombo === 50) {
-      spawnConfetti(innerWidth / 2, innerHeight * 0.4, 60, 350, 250);
-      playCheer(0.8);
-    }
-    
-    // Smaller confetti for every 5 combo after 10
-    else if (currentCombo > 10 && currentCombo % 5 === 0) {
-      spawnConfetti(innerWidth / 2, innerHeight * 0.5, 30, 250, 200);
-      playCheer(0.6);
-    }
-  }
-
-  function playCheer(intensity = 1.0) {
-    if (!audioPrimed) return;
-    // Ascending chime celebration
-    const baseFreq = 520;
-    playTone(baseFreq * intensity, 0.08, "sine", 0.12);
-    setTimeout(() => playTone(baseFreq * 1.25 * intensity, 0.08, "sine", 0.14), 60);
-    setTimeout(() => playTone(baseFreq * 1.5 * intensity, 0.10, "sine", 0.16), 120);
   }
 
   function bubbleEscaped() {
@@ -219,11 +148,6 @@
         // If popping 90%+ of bubbles, increase difficulty
         if (successRate >= 0.9 && difficultyLevel < 3.0) {
           difficultyLevel += 0.2;
-          // Celebrate perfect or near-perfect performance!
-          if (successRate >= 0.95) {
-            spawnConfettiCannons(100);
-            playCheer(1.2);
-          }
         }
         // If missing 50%+ of bubbles, decrease difficulty
         else if (successRate < 0.5 && difficultyLevel > 0.5) {
@@ -242,16 +166,6 @@
       bubblesPopped = 0;
       bubblesEscaped = 0;
     }
-  }
-
-  // Confetti cannons from screen edges
-  function spawnConfettiCannons(amount) {
-    // Left cannon
-    spawnConfetti(50, innerHeight * 0.6, amount / 2, 100, 400);
-    // Right cannon
-    setTimeout(() => {
-      spawnConfetti(innerWidth - 50, innerHeight * 0.6, amount / 2, 100, 400);
-    }, 150);
   }
 
   // ---------------- Sound (Web Audio) ----------------
@@ -513,10 +427,17 @@
         }
         break;
 
-      case 2: // Giant slow rings - MORE RINGS AND COLORS
+      case 2: // Giant slow rings - MORE RINGS AND COLORS WITH SHOCKWAVE
+        // Create a unique chain ID for this Giant bubble's chain reaction
+        const chainId = Symbol();
+        
+        // Create initial chain display at origin
+        createChainDisplay(x, y, 0, chainId);
+        
+        // Create shockwave rings that can pop other bubbles
         for (let i=0; i<5; i++) {
           setTimeout(() => {
-            state.particles.push({
+            const shockwave = {
               kind: "ring",
               x, y,
               r: r * 0.3,
@@ -524,7 +445,11 @@
               life: rand(0.8, 1.4),
               hue: hue + i * 30,
               fadeType: i % 3,
-            });
+              isShockwave: true, // Mark as shockwave
+              origin: { x, y },
+              chainId: chainId, // Assign chain ID
+            };
+            state.particles.push(shockwave);
           }, i * 60);
         }
         // Lots of colorful debris with varied shapes
@@ -750,9 +675,64 @@
     }
   }
 
+  // Create a scaled shockwave based on bubble size
+  function createScaledShockwave(x, y, bubbleRadius, hue, chainId = null) {
+    // Scale the shockwave properties based on bubble size
+    // Smaller bubbles = smaller, faster shockwaves
+    // Larger bubbles = larger, slower shockwaves
+    const sizeScale = bubbleRadius / 50; // Normalize to typical bubble size
+    const numRings = Math.max(1, Math.floor(sizeScale * 3)); // 1-3 rings based on size
+    const maxRadius = bubbleRadius * 3; // Shockwave reaches 3x bubble radius
+    
+    for (let i = 0; i < numRings; i++) {
+      setTimeout(() => {
+        const shockwave = {
+          kind: "ring",
+          x, y,
+          r: bubbleRadius * 0.2,
+          growSpeed: (3 + sizeScale * 2) * (1 + i * 0.2), // Faster for bigger bubbles
+          life: 0.6 + sizeScale * 0.4, // Lives longer based on size
+          hue: hue + i * 40,
+          fadeType: i % 3,
+          isShockwave: true,
+          origin: { x, y },
+          maxRadius: maxRadius, // Stop expanding at this radius
+          chainId: chainId, // Propagate chain ID
+        };
+        state.particles.push(shockwave);
+      }, i * 40);
+    }
+  }
+
+  // Create intense chain display text
+  function createChainDisplay(x, y, count, chainId) {
+    const displayIndex = state.chainDisplays.length;
+    state.chainDisplays.push({
+      x,
+      y: y - 20, // Start slightly above
+      count,
+      life: 1.5, // Lives for 1.5 seconds
+      scale: 0.5, // Start small
+      maxScale: 1.5 + count * 0.2, // Bigger for longer chains
+      vy: -50, // Float upward
+    });
+    
+    // Track this chain
+    activeChains.set(chainId, {
+      count,
+      displayIndex,
+      originX: x,
+      originY: y,
+    });
+    
+    // Clean up chain data when display expires
+    setTimeout(() => {
+      activeChains.delete(chainId);
+    }, 1500);
+  }
+
   // ---------------- Input Handling ----------------
   let isDragging = false;
-  let currentDragTrail = null;
   let lastDragCheck = { x: 0, y: 0 };
 
   function handlePointerDown(e) {
@@ -766,14 +746,6 @@
     
     isDragging = true;
     lastDragCheck = { x, y };
-    
-    // Create new drag trail
-    currentDragTrail = {
-      points: [{ x, y, time: performance.now() }],
-      hue: rand(0, 360),
-      width: 8,
-    };
-    state.dragTrails.push(currentDragTrail);
 
     // Check for bubble hit
     checkBubbleHit(x, y);
@@ -784,36 +756,6 @@
     
     const x = e.clientX;
     const y = e.clientY;
-    
-    // Add point to trail
-    if (currentDragTrail) {
-      const lastPoint = currentDragTrail.points[currentDragTrail.points.length - 1];
-      const dist = Math.hypot(x - lastPoint.x, y - lastPoint.y);
-      
-      // Add point if moved enough
-      if (dist > 5) {
-        currentDragTrail.points.push({ x, y, time: performance.now() });
-        
-        // Spawn sparkles along the trail
-        if (Math.random() < 0.3) {
-          state.particles.push({
-            kind: "star",
-            x: x + rand(-5, 5),
-            y: y + rand(-5, 5),
-            vx: rand(-1, 1),
-            vy: rand(-1, 1),
-            size: rand(2, 5),
-            rot: rand(0, Math.PI*2),
-            vr: rand(-10, 10),
-            twinkle: rand(0, Math.PI*2),
-            life: rand(0.3, 0.6),
-            hue: currentDragTrail.hue + rand(-30, 30),
-            gravity: 0.3,
-            fadeType: 2,
-          });
-        }
-      }
-    }
     
     // Check for bubbles along the drag path
     const dx = x - lastDragCheck.x;
@@ -834,7 +776,6 @@
 
   function handlePointerUp(e) {
     isDragging = false;
-    currentDragTrail = null;
   }
 
   function checkBubbleHit(x, y) {
@@ -849,18 +790,6 @@
         explodeBubble(b);
         const pointsEarned = b.type.points * Math.max(1, combo);
         updateScore(pointsEarned);
-        
-        // Extra confetti for high-value pops
-        if (b.type.points >= 30) {
-          // Tiny or Giant bubbles get extra celebration
-          spawnMiniConfetti(b.x, b.y, 20);
-        }
-        
-        // Big confetti for huge combo multipliers
-        if (combo >= 15) {
-          spawnMiniConfetti(b.x, b.y, 15);
-        }
-        
         state.bubbles.splice(i, 1);
       }
     }
@@ -870,34 +799,6 @@
   canvas.addEventListener("pointermove", handlePointerMove, { passive: true });
   canvas.addEventListener("pointerup", handlePointerUp, { passive: true });
   canvas.addEventListener("pointercancel", handlePointerUp, { passive: true });
-
-  // Mini confetti burst at pop location
-  function spawnMiniConfetti(x, y, amount) {
-    for (let i = 0; i < amount; i++) {
-      const angle = rand(0, Math.PI * 2);
-      const speed = rand(4, 10);
-      const shapeType = Math.floor(Math.random() * 3);
-      let kind = shapeType === 0 ? "star" : (shapeType === 1 ? "diamond" : "circle");
-      
-      state.particles.push({
-        kind,
-        x, y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        r: kind === "circle" ? rand(2, 4) : undefined,
-        size: kind !== "circle" ? rand(3, 6) : undefined,
-        rot: rand(0, Math.PI*2),
-        vr: rand(-15, 15),
-        twinkle: kind === "star" ? rand(0, Math.PI*2) : undefined,
-        life: rand(0.4, 0.8),
-        hue: rand(0, 360),
-        gravity: 1.0,
-        fadeType: 2,
-      });
-    }
-  }
-
-  canvas.addEventListener("pointerdown", handlePointerDown, { passive: true });
 
   // ---------------- Update ----------------
   function update(dt) {
@@ -915,27 +816,59 @@
       }
     }
 
-    // Update drag trails (fade out old points)
-    const now = performance.now();
-    for (let i = state.dragTrails.length - 1; i >= 0; i--) {
-      const trail = state.dragTrails[i];
-      
-      // Remove old points (older than 1 second)
-      trail.points = trail.points.filter(p => now - p.time < 1000);
-      
-      // Remove trail if no points left
-      if (trail.points.length === 0) {
-        state.dragTrails.splice(i, 1);
-      }
-    }
-
     // Update particles
     for (let i = state.particles.length - 1; i >= 0; i--) {
       const p = state.particles[i];
       p.life -= dt;
 
       if (p.kind === "ring") {
+        const oldR = p.r;
         p.r += p.growSpeed * 60 * dt;
+        
+        // Stop growing if we hit max radius
+        if (p.maxRadius && p.r > p.maxRadius) {
+          p.r = p.maxRadius;
+          p.life = Math.min(p.life, 0.2); // Start fading out quickly
+        }
+        
+        // Check for shockwave collisions with bubbles (only check newly expanded area)
+        if (p.isShockwave && p.origin && p.r <= (p.maxRadius || Infinity)) {
+          for (let j = state.bubbles.length - 1; j >= 0; j--) {
+            const b = state.bubbles[j];
+            const dx = b.x - p.origin.x;
+            const dy = b.y - p.origin.y;
+            const distFromCenter = Math.hypot(dx, dy);
+            
+            // Check if bubble is within the expanding ring (with some thickness)
+            const ringThickness = 20;
+            if (Math.abs(distFromCenter - p.r) < ringThickness + b.r) {
+              const chainId = p.chainId;
+              
+              if (chainId) {
+                // Increment chain count
+                const chainData = activeChains.get(chainId);
+                if (chainData) {
+                  chainData.count++;
+                  // Update the existing display
+                  if (state.chainDisplays[chainData.displayIndex]) {
+                    state.chainDisplays[chainData.displayIndex].count = chainData.count;
+                    state.chainDisplays[chainData.displayIndex].life = 1.5; // Reset life
+                  }
+                }
+              }
+              
+              // Pop the bubble!
+              explodeBubble(b);
+              const pointsEarned = Math.floor(b.type.points * 0.5); // Half points for chain pops
+              updateScore(pointsEarned);
+              
+              // Create a scaled shockwave from this bubble with chain ID
+              createScaledShockwave(b.x, b.y, b.r, b.hue, chainId);
+              
+              state.bubbles.splice(j, 1);
+            }
+          }
+        }
       } else {
         p.x += p.vx * 60 * dt;
         p.y += p.vy * 60 * dt;
@@ -979,6 +912,38 @@
         comboEl.classList.remove("active");
       }
     }
+    
+    // Update chain displays
+    for (let i = state.chainDisplays.length - 1; i >= 0; i--) {
+      const d = state.chainDisplays[i];
+      d.life -= dt;
+      d.y += d.vy * dt;
+      
+      // Update maxScale as count increases
+      d.maxScale = 1.5 + d.count * 0.2;
+      
+      // Animate scale (pop in, then settle)
+      const lifeProgress = 1 - (d.life / 1.5);
+      if (lifeProgress < 0.2) {
+        // Pop in
+        d.scale = lerp(0.5, d.maxScale, lifeProgress / 0.2);
+      } else if (lifeProgress < 0.4) {
+        // Settle back
+        d.scale = lerp(d.maxScale, d.maxScale * 0.9, (lifeProgress - 0.2) / 0.2);
+      } else {
+        // Stay at settled size, but grow if count increases
+        const targetScale = d.maxScale * 0.9;
+        d.scale = lerp(d.scale, targetScale, dt * 10); // Smooth interpolation
+      }
+      
+      // Slow down upward movement
+      d.vy *= (1 - 2.0 * dt);
+      
+      // Remove if dead
+      if (d.life <= 0) {
+        state.chainDisplays.splice(i, 1);
+      }
+    }
   }
 
   // ---------------- Draw ----------------
@@ -986,61 +951,6 @@
     // Background
     ctx.fillStyle = "rgba(10, 5, 32, 0.15)";
     ctx.fillRect(0, 0, innerWidth, innerHeight);
-
-    // Draw drag trails first (behind everything)
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    const now = performance.now();
-    
-    for (const trail of state.dragTrails) {
-      if (trail.points.length < 2) continue;
-      
-      // Draw gradient trail
-      for (let i = 1; i < trail.points.length; i++) {
-        const p1 = trail.points[i - 1];
-        const p2 = trail.points[i];
-        
-        // Calculate age-based alpha for each segment
-        const age1 = (now - p1.time) / 1000; // 0 to 1 second
-        const age2 = (now - p2.time) / 1000;
-        const alpha1 = 1 - age1;
-        const alpha2 = 1 - age2;
-        
-        // Create gradient along segment
-        const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
-        gradient.addColorStop(0, `hsla(${trail.hue}, 90%, 70%, ${alpha1 * 0.6})`);
-        gradient.addColorStop(1, `hsla(${trail.hue}, 90%, 70%, ${alpha2 * 0.6})`);
-        
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = trail.width * Math.max(alpha1, alpha2);
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-      }
-      
-      // Draw glowing core on recent trail points
-      for (let i = 0; i < trail.points.length; i++) {
-        const p = trail.points[i];
-        const age = (now - p.time) / 1000;
-        const alpha = (1 - age) * 0.4;
-        
-        if (alpha > 0.1) {
-          ctx.globalAlpha = alpha;
-          const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, trail.width * 1.5);
-          glow.addColorStop(0, `hsla(${trail.hue + 30}, 100%, 85%, 1)`);
-          glow.addColorStop(1, `hsla(${trail.hue}, 90%, 70%, 0)`);
-          ctx.fillStyle = glow;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, trail.width * 1.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-    }
-    ctx.restore();
 
     // Draw particles
     ctx.save();
@@ -1193,18 +1103,33 @@
 
     // Draw bubbles
     ctx.save();
+    const now = performance.now();
     for (const b of state.bubbles) {
       const hue = b.hue;
       
-      // Outer glow
-      ctx.globalAlpha = 0.3;
-      const glow = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, b.r * 1.3);
+      // All bubbles create shockwaves, so they all pulse!
+      // Pulse effect based on time and bubble size
+      const pulseSpeed = 2.0 + (b.r / 50); // Bigger bubbles pulse slower
+      const pulse = Math.sin(now * 0.003 * pulseSpeed) * 0.15 + 1; // 0.85 to 1.15
+      
+      // Outer glow (pulses)
+      ctx.globalAlpha = 0.3 * pulse;
+      const glowSize = b.r * 1.3 * pulse;
+      const glow = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, glowSize);
       glow.addColorStop(0, `hsla(${hue}, 85%, 70%, 0.4)`);
       glow.addColorStop(1, `hsla(${hue}, 85%, 70%, 0)`);
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r * 1.3, 0, Math.PI*2);
+      ctx.arc(b.x, b.y, glowSize, 0, Math.PI*2);
       ctx.fill();
+      
+      // Pulsing energy ring around bubble
+      ctx.globalAlpha = 0.4 * pulse;
+      ctx.strokeStyle = `hsla(${hue}, 90%, 75%, ${0.6 * pulse})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r * (1.1 + pulse * 0.1), 0, Math.PI*2);
+      ctx.stroke();
 
       // Main bubble
       ctx.globalAlpha = 0.6;
@@ -1227,6 +1152,53 @@
       ctx.beginPath();
       ctx.arc(b.x - b.r*0.4, b.y - b.r*0.4, b.r*0.15, 0, Math.PI*2);
       ctx.fill();
+    }
+    ctx.restore();
+    
+    // Draw chain reaction displays (on top of everything)
+    ctx.save();
+    for (const d of state.chainDisplays) {
+      const alpha = clamp(d.life / 0.5, 0, 1); // Fade out in last 0.5 seconds
+      
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      
+      // Calculate colors based on chain length
+      const hue = 30 + d.count * 15; // Yellow to red spectrum
+      
+      // Outer glow
+      ctx.shadowBlur = 20 * d.scale;
+      ctx.shadowColor = `hsla(${hue}, 100%, 50%, ${alpha})`;
+      
+      // Main text
+      const fontSize = Math.floor(40 * d.scale);
+      ctx.font = `900 ${fontSize}px system-ui, -apple-system, sans-serif`;
+      ctx.fillStyle = `hsla(${hue}, 100%, 60%, 1)`;
+      ctx.fillText(`${d.count}x CHAIN!`, d.x, d.y);
+      
+      // Inner highlight
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = `hsla(${hue + 30}, 100%, 85%, ${alpha * 0.8})`;
+      ctx.fillText(`${d.count}x CHAIN!`, d.x, d.y - 2);
+      
+      // Impact lines (if chain is big enough)
+      if (d.count >= 3) {
+        ctx.strokeStyle = `hsla(${hue}, 100%, 70%, ${alpha * 0.6})`;
+        ctx.lineWidth = 3 * d.scale;
+        const lineLength = 30 * d.scale;
+        for (let i = 0; i < 4; i++) {
+          const angle = (i / 4) * Math.PI * 2 + performance.now() * 0.01;
+          const x1 = d.x + Math.cos(angle) * (fontSize * 0.8);
+          const y1 = d.y + Math.sin(angle) * (fontSize * 0.5);
+          const x2 = d.x + Math.cos(angle) * (fontSize * 0.8 + lineLength);
+          const y2 = d.y + Math.sin(angle) * (fontSize * 0.5 + lineLength);
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+      }
     }
     ctx.restore();
   }
