@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Touchy Effects (v2)</title>
+  <title>Touchy Effects (v3)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -335,7 +335,7 @@
   let autoSliders = true;
   const autoSlidersSync = hookSwitch("autoSlidersToggle", "autoSlidersSwitch", () => autoSliders, (v) => autoSliders = v);
 
-  let autoCycle = false;
+  let autoCycle = true;
   const autoCycleSync = hookSwitch("autoCycleToggle", "autoCycleSwitch", () => autoCycle, (v) => autoCycle = v);
 
   // ---------------- Effect system ----------------
