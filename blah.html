@@ -3,46 +3,70 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Touchy Effects</title>
+  <title>Touchy Effects (v2)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
       background: #050510;
       overflow: hidden;
-      touch-action: none; /* critical for iPad */
+      touch-action: none;
     }
     canvas { display:block; width:100vw; height:100vh; }
 
-    .panel {
+    /* Top-left arrow button */
+    .toggleBtn {
       position: fixed;
       left: 12px; top: 12px;
-      width: min(420px, calc(100vw - 24px));
-      z-index: 10;
+      width: 48px; height: 48px;
+      border: 0;
+      border-radius: 16px;
+      z-index: 20;
 
+      background: rgba(255,255,255,0.14);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       color: rgba(255,255,255,0.92);
-      font: 600 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+
+      font: 900 22px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      display: grid;
+      place-items: center;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .toggleBtn:active { transform: scale(0.98); }
+
+    /* Collapsible settings pane */
+    .pane {
+      position: fixed;
+      left: 12px; top: 68px;
+      width: min(420px, calc(100vw - 24px));
+      z-index: 20;
 
       background: rgba(255,255,255,0.10);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-radius: 18px;
       padding: 12px;
+
+      color: rgba(255,255,255,0.92);
+      font: 700 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+
       box-shadow: 0 10px 24px rgba(0,0,0,0.35);
       user-select: none;
       -webkit-user-select: none;
-      transition: opacity 220ms ease;
+
+      transform-origin: top left;
+      transition: transform 220ms ease, opacity 220ms ease;
+    }
+    .pane.closed {
+      opacity: 0;
+      transform: scale(0.95);
+      pointer-events: none;
     }
 
-    .row {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 10px;
-      flex-wrap: wrap;
-    }
-
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom: 10px; }
     button, select {
-      font: 700 16px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font: 800 15px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       padding: 10px 12px;
       border: 0;
       border-radius: 14px;
@@ -53,10 +77,42 @@
     button:active { transform: scale(0.98); }
     select { flex: 1; min-width: 220px; }
 
+    .toggle {
+      display:flex; align-items:center; justify-content:space-between;
+      gap: 10px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 10px 12px;
+    }
+    .toggle .sub {
+      font-weight: 650;
+      font-size: 12px;
+      color: rgba(255,255,255,0.70);
+      margin-top: 4px;
+    }
+    .switch {
+      width: 52px; height: 30px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      position: relative;
+      flex: 0 0 auto;
+    }
+    .switch::after {
+      content:"";
+      position:absolute; top: 4px; left: 4px;
+      width: 22px; height: 22px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.88);
+      transition: transform 160ms ease;
+    }
+    .switch.on { background: rgba(140, 255, 210, 0.24); }
+    .switch.on::after { transform: translateX(22px); }
+
     .sliders {
       display: grid;
       grid-template-columns: 1fr;
       gap: 10px;
+      margin-top: 6px;
     }
     .slider {
       display: grid;
@@ -69,27 +125,25 @@
     }
     .slider label {
       display: block;
-      font-weight: 700;
-      font-size: 14px;
+      font-weight: 800;
+      font-size: 13px;
       color: rgba(255,255,255,0.85);
       margin-bottom: 6px;
     }
     .slider .value {
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 12px;
+      font-weight: 800;
       color: rgba(255,255,255,0.75);
       min-width: 64px;
       text-align: right;
     }
-    input[type="range"] {
-      width: 100%;
-      accent-color: rgba(255,255,255,0.9);
-    }
+    input[type="range"] { width: 100%; accent-color: rgba(255,255,255,0.9); }
 
+    /* Subtle hint */
     .hint {
       position: fixed; right: 12px; top: 12px;
       z-index: 10;
-      font: 600 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font: 700 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       color: rgba(255,255,255,0.70);
       background: rgba(255,255,255,0.08);
       backdrop-filter: blur(10px);
@@ -100,22 +154,47 @@
       -webkit-user-select: none;
       transition: opacity 220ms ease;
     }
-
-    .hidden { opacity: 0; pointer-events: none; }
+    .hint.hidden { opacity: 0; }
   </style>
 </head>
 <body>
-  <div id="panel" class="panel">
+  <button id="paneToggle" class="toggleBtn" aria-label="Settings">❮</button>
+
+  <div id="pane" class="pane closed">
     <div class="row">
       <button id="clearBtn">Clear</button>
-      <button id="lockBtn" title="Hide UI after a few seconds">Toddler UI: ON</button>
+      <button id="randomizeBtn" title="Gently randomize current effect sliders">Shuffle</button>
     </div>
 
     <div class="row">
       <select id="effectSelect"></select>
     </div>
 
-    <div id="sliders" class="sliders"></div>
+    <div class="toggle" id="soundToggle">
+      <div>
+        Sound
+        <div class="sub">Soft chimes + pops (starts after first touch)</div>
+      </div>
+      <div class="switch" id="soundSwitch"></div>
+    </div>
+
+    <div class="toggle" id="autoSlidersToggle" style="margin-top:10px;">
+      <div>
+        Auto-modulate sliders
+        <div class="sub">Values drift while you play</div>
+      </div>
+      <div class="switch" id="autoSlidersSwitch"></div>
+    </div>
+
+    <div class="toggle" id="autoCycleToggle" style="margin-top:10px;">
+      <div>
+        Auto-cycle effects
+        <div class="sub">Switch effects every few seconds</div>
+      </div>
+      <div class="switch" id="autoCycleSwitch"></div>
+    </div>
+
+    <div class="sliders" id="sliders"></div>
   </div>
 
   <div id="hint" class="hint">Touch & drag ✨ (multi-touch works)</div>
@@ -123,7 +202,7 @@
 
 <script>
 (() => {
-  // ---------- Canvas setup ----------
+  // ---------------- Canvas setup ----------------
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d", { alpha: true });
 
@@ -140,196 +219,237 @@
     gooCanvas.width = canvas.width;
     gooCanvas.height = canvas.height;
 
-    // Use CSS pixel coordinates in drawing
+    // Draw in CSS pixels
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     gtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   addEventListener("resize", resize, { passive: true });
   resize();
 
-  // ---------- UI ----------
-  const panel = document.getElementById("panel");
-  const hint = document.getElementById("hint");
-  const slidersEl = document.getElementById("sliders");
-  const effectSelect = document.getElementById("effectSelect");
-
-  let toddlerMode = true; // auto-hide UI
-  let lastInteractionAt = performance.now();
-  const UI_HIDE_MS = 3500;
-
-  function pokeUI() {
-    lastInteractionAt = performance.now();
-    if (toddlerMode) {
-      panel.classList.remove("hidden");
-      hint.classList.remove("hidden");
-    }
-  }
-
-  document.getElementById("lockBtn").onclick = () => {
-    toddlerMode = !toddlerMode;
-    document.getElementById("lockBtn").textContent = "Toddler UI: " + (toddlerMode ? "ON" : "OFF");
-    if (!toddlerMode) {
-      panel.classList.remove("hidden");
-      hint.classList.remove("hidden");
-    }
-    pokeUI();
-  };
-
-  document.getElementById("clearBtn").onclick = () => {
-    state.particles.length = 0;
-    state.blobs.length = 0;
-    state.bubbles.length = 0;
-    state.ribbons.clear();
-    state.trails.clear();
-    pokeUI();
-  };
-
-  // Prevent UI touches from painting the canvas:
-  panel.addEventListener("pointerdown", (e) => { e.stopPropagation(); pokeUI(); }, { passive: true });
-  panel.addEventListener("pointermove", (e) => { e.stopPropagation(); pokeUI(); }, { passive: true });
-
-  // ---------- Helpers ----------
+  // ---------------- Helpers ----------------
   const rand = (a,b)=>a+Math.random()*(b-a);
   const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
   const lerp = (a,b,t)=>a+(b-a)*t;
 
   function fmt(v, step) {
-    // show nice values for slider labels
     const s = step || 1;
     const d = (s < 1) ? (String(s).split(".")[1]?.length || 0) : 0;
-    return v.toFixed(d);
+    return Number(v).toFixed(d);
   }
 
-  // ---------- Effect system ----------
-  // Each effect defines sliders with names + ranges, and handlers for pointer events + draw/update.
-  // Sliders are stored in effectParams[effectId][key] and changed dynamically.
+  // ---------------- UI: collapsible pane ----------------
+  const pane = document.getElementById("pane");
+  const hint = document.getElementById("hint");
+  const paneToggle = document.getElementById("paneToggle");
+
+  let paneOpen = false;
+  function setPaneOpen(open) {
+    paneOpen = open;
+    pane.classList.toggle("closed", !open);
+    paneToggle.textContent = open ? "❯" : "❮";
+  }
+  paneToggle.onclick = (e) => {
+    e.stopPropagation();
+    setPaneOpen(!paneOpen);
+  };
+
+  // Prevent pane interaction from painting:
+  pane.addEventListener("pointerdown", (e) => e.stopPropagation(), { passive: true });
+  pane.addEventListener("pointermove", (e) => e.stopPropagation(), { passive: true });
+
+  // Tap canvas hides hint after a bit:
+  let hintTimer = 0;
+
+  // ---------------- Sound (Web Audio) ----------------
+  let audioCtx = null;
+  let soundEnabled = true;
+  let audioPrimed = false;
+
+  function ensureAudio() {
+    if (!soundEnabled) return;
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    audioPrimed = true;
+  }
+
+  function playTone(freq, dur=0.08, type="sine", vol=0.05) {
+    if (!soundEnabled) return;
+    if (!audioPrimed) return; // wait for first gesture
+    const t0 = audioCtx.currentTime;
+
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+    o.connect(g);
+    g.connect(audioCtx.destination);
+
+    o.start(t0);
+    o.stop(t0 + dur + 0.02);
+  }
+
+  function playPop(intensity=1) {
+    // short, soft “pop”
+    const f = lerp(180, 420, clamp(intensity, 0, 1));
+    playTone(f, 0.06, "triangle", 0.045);
+  }
+  function playChime(intensity=1) {
+    // two-note chime
+    const base = lerp(420, 860, clamp(intensity, 0, 1));
+    playTone(base, 0.08, "sine", 0.04);
+    setTimeout(() => playTone(base*1.25, 0.07, "sine", 0.03), 25);
+  }
+  
+
+  // ---------------- Toggles in pane ----------------
+  function hookSwitch(containerId, switchId, getter, setter) {
+    const row = document.getElementById(containerId);
+    const sw = document.getElementById(switchId);
+    function sync() { sw.classList.toggle("on", !!getter()); }
+    row.addEventListener("click", () => { setter(!getter()); sync(); }, { passive: true });
+    sync();
+    return sync;
+  }
+
+  const soundSync = hookSwitch("soundToggle", "soundSwitch",
+    () => soundEnabled,
+    (v) => { soundEnabled = v; if (!v) return; if (audioCtx) ensureAudio(); }
+  );
+
+  let autoSliders = true;
+  const autoSlidersSync = hookSwitch("autoSlidersToggle", "autoSlidersSwitch", () => autoSliders, (v) => autoSliders = v);
+
+  let autoCycle = false;
+  const autoCycleSync = hookSwitch("autoCycleToggle", "autoCycleSwitch", () => autoCycle, (v) => autoCycle = v);
+
+  // ---------------- Effect system ----------------
+  const slidersEl = document.getElementById("sliders");
+  const effectSelect = document.getElementById("effectSelect");
+
   const effects = [
     {
       id: "sparklyGoo",
       name: "✨ Sparkly Goo",
       sliders: [
-        { key: "goo",      label: "Goo Amount",    min: 0, max: 1, step: 0.01, def: 1 },
-        { key: "sparkle",  label: "Sparkle Amount",min: 0, max: 1, step: 0.01, def: 1 },
-        { key: "size",     label: "Blob Size",     min: 10, max: 42, step: 1, def: 24 },
-        { key: "blur",     label: "Goo Blur",      min: 0, max: 24, step: 1, def: 12 },
-        { key: "gravity",  label: "Floatiness",    min: -1.2, max: 1.2, step: 0.05, def: -0.35 },
+        { key:"goo", label:"Goo Amount", min:0, max:1, step:0.01, def:1, mod:0.20 },
+        { key:"sparkle", label:"Sparkle Amount", min:0, max:1, step:0.01, def:1, mod:0.22 },
+        { key:"size", label:"Blob Size", min:10, max:44, step:1, def:24, mod:0.12 },
+        { key:"blur", label:"Goo Blur", min:0, max:26, step:1, def:12, mod:0.10 },
+        { key:"float", label:"Floatiness", min:-1.2, max:1.2, step:0.05, def:-0.35, mod:0.14 },
       ],
-      onDown(x,y,meta){ burstStars(x,y, 18, 0.8); dropBlob(x,y, meta, 1.3); },
+      onDown(x,y,meta){ burstStars(x,y, 18, 0.8); dropBlob(x,y, meta, 1.3); playChime(0.5); },
       onMove(x,y,meta){
         const speed = meta.speed;
-        const gooAmt = p("goo"), spAmt = p("sparkle");
-        if (gooAmt > 0.01) dropBlob(x,y, meta, clamp(speed/14, 0.6, 2.0) * gooAmt);
-        if (spAmt > 0.01 && speed > 1.5) burstSparkles(x,y, Math.floor(clamp(speed/2, 2, 14) * spAmt));
+        if (p("goo") > 0.01) dropBlob(x,y, meta, clamp(speed/14, 0.6, 2.0) * p("goo"));
+        if (p("sparkle") > 0.01 && speed > 1.5) {
+          burstSparkles(x,y, Math.floor(clamp(speed/2, 2, 14) * p("sparkle")));
+          if (speed > 10) playTone(lerp(320, 760, clamp(speed/28,0,1)), 0.04, "sine", 0.02);
+        }
       },
-      drawBackground(){ drawSoftBackground(); },
-      drawOverlay(){ drawTrails(0.16); },
-      tick(dt){ /* uses global particle systems */ }
+      drawOverlay(){ drawTrails(0.16); drawGoo(p("blur")); },
     },
-
     {
       id: "starBursts",
       name: "⭐ Star Bursts",
       sliders: [
-        { key: "rate",     label: "Burst Rate",     min: 0.1, max: 2.0, step: 0.05, def: 1.0 },
-        { key: "points",   label: "Star Points",    min: 4, max: 10, step: 1, def: 5 },
-        { key: "radius",   label: "Star Size",      min: 10, max: 60, step: 1, def: 28 },
-        { key: "spark",    label: "Glitter",        min: 0, max: 1, step: 0.01, def: 0.7 },
-        { key: "wobble",   label: "Wobble",         min: 0, max: 1, step: 0.01, def: 0.5 },
+        { key:"rate", label:"Burst Rate", min:0.1, max:2.0, step:0.05, def:1.0, mod:0.18 },
+        { key:"points", label:"Star Points", min:4, max:10, step:1, def:5, mod:0.10 },
+        { key:"radius", label:"Star Size", min:10, max:70, step:1, def:28, mod:0.15 },
+        { key:"glitter", label:"Glitter", min:0, max:1, step:0.01, def:0.7, mod:0.22 },
+        { key:"wobble", label:"Wobble", min:0, max:1, step:0.01, def:0.5, mod:0.20 },
       ],
-      onDown(x,y){ spawnBurstStar(x,y, 1.0); },
+      onDown(x,y){ spawnBurstStar(x,y, 1.0); playChime(0.6); },
       onMove(x,y,meta){
-        // Emit based on distance moved
         const rate = p("rate");
-        meta.emitAccumulator = (meta.emitAccumulator || 0) + meta.dist * 0.02 * rate;
-        while (meta.emitAccumulator > 1) {
-          meta.emitAccumulator -= 1;
+        meta.emitAcc = (meta.emitAcc || 0) + meta.dist * 0.02 * rate;
+        while (meta.emitAcc > 1) {
+          meta.emitAcc -= 1;
           spawnBurstStar(x,y, 0.75);
+          if (p("glitter") > 0.2) playTone(rand(520, 980), 0.03, "triangle", 0.02);
         }
-        if (p("spark") > 0.01 && meta.speed > 2) burstSparkles(x,y, Math.floor(clamp(meta.speed, 0, 12) * p("spark")));
+        if (p("glitter") > 0.01 && meta.speed > 2) burstSparkles(x,y, Math.floor(clamp(meta.speed, 0, 12) * p("glitter")));
       },
-      drawBackground(){ drawSoftBackground(); },
       drawOverlay(){ drawTrails(0.10); }
     },
-
     {
       id: "fireworks",
       name: "🎆 Fireworks Paint",
       sliders: [
-        { key: "pop",      label: "Pop Size",       min: 10, max: 90, step: 1, def: 48 },
-        { key: "count",    label: "Particles",      min: 10, max: 80, step: 1, def: 34 },
-        { key: "spread",   label: "Spread",         min: 0.3, max: 3.0, step: 0.05, def: 1.2 },
-        { key: "drag",     label: "Air Drag",       min: 0.0, max: 0.25, step: 0.01, def: 0.10 },
-        { key: "glow",     label: "Glow",           min: 0, max: 1, step: 0.01, def: 0.85 },
+        { key:"pop", label:"Pop Size", min:10, max:90, step:1, def:48, mod:0.18 },
+        { key:"count", label:"Particles", min:10, max:90, step:1, def:34, mod:0.12 },
+        { key:"spread", label:"Spread", min:0.3, max:3.0, step:0.05, def:1.2, mod:0.16 },
+        { key:"drag", label:"Air Drag", min:0.0, max:0.25, step:0.01, def:0.10, mod:0.12 },
+        { key:"glow", label:"Glow", min:0, max:1, step:0.01, def:0.85, mod:0.20 },
       ],
-      onDown(x,y){ fireworkPop(x,y, 1.0); },
+      onDown(x,y){ fireworkPop(x,y, 1.0); playPop(0.8); },
       onMove(x,y,meta){
-        // Pop occasionally, more when moving fast
         meta.popTimer = (meta.popTimer || 0) - meta.dt;
         const interval = lerp(0.22, 0.05, clamp(meta.speed/18, 0, 1));
         if (meta.popTimer <= 0) {
           meta.popTimer = interval;
           fireworkPop(x,y, 0.9);
+          playPop(clamp(meta.speed/18,0,1));
         }
       },
-      drawBackground(){ drawSoftBackground(); },
       drawOverlay(){ drawTrails(0.08); }
     },
-
     {
       id: "bubbles",
       name: "🫧 Bubbles & Pops",
       sliders: [
-        { key: "bubbleSize", label: "Bubble Size",  min: 10, max: 70, step: 1, def: 34 },
-        { key: "rise",       label: "Rise Speed",   min: 0.2, max: 2.2, step: 0.05, def: 1.0 },
-        { key: "count",      label: "Bubble Amount",min: 0.1, max: 2.0, step: 0.05, def: 1.0 },
-        { key: "popSpark",   label: "Pop Sparkle",  min: 0, max: 1, step: 0.01, def: 0.6 },
-        { key: "wiggle",     label: "Wiggle",       min: 0, max: 1, step: 0.01, def: 0.35 },
+        { key:"bubbleSize", label:"Bubble Size", min:10, max:80, step:1, def:34, mod:0.14 },
+        { key:"rise", label:"Rise Speed", min:0.2, max:2.4, step:0.05, def:1.0, mod:0.16 },
+        { key:"amount", label:"Bubble Amount", min:0.1, max:2.2, step:0.05, def:1.0, mod:0.18 },
+        { key:"popSpark", label:"Pop Sparkle", min:0, max:1, step:0.01, def:0.6, mod:0.22 },
+        { key:"wiggle", label:"Wiggle", min:0, max:1, step:0.01, def:0.35, mod:0.18 },
       ],
-      onDown(x,y){ spawnBubble(x,y, 1.2); },
+      onDown(x,y){ spawnBubble(x,y, 1.2); playTone(260, 0.05, "sine", 0.03); },
       onMove(x,y,meta){
-        const amt = p("count");
+        const amt = p("amount");
         meta.bAcc = (meta.bAcc || 0) + meta.dist * 0.02 * amt;
         while (meta.bAcc > 1) {
           meta.bAcc -= 1;
           spawnBubble(x,y, 1.0);
+          if (Math.random() < 0.15) playTone(rand(220, 340), 0.03, "sine", 0.015);
         }
       },
-      drawBackground(){ drawSoftBackground(); },
-      drawOverlay(){ /* no trail by default */ }
+      drawOverlay(){ drawBubbles(); }
     },
-
     {
       id: "ribbon",
       name: "🌈 Rainbow Ribbon",
       sliders: [
-        { key: "width",    label: "Ribbon Width",   min: 6, max: 40, step: 1, def: 20 },
-        { key: "spring",   label: "Springiness",    min: 0.02, max: 0.25, step: 0.01, def: 0.10 },
-        { key: "smooth",   label: "Smoothness",     min: 0.05, max: 0.55, step: 0.01, def: 0.22 },
-        { key: "glitter",  label: "Glitter",        min: 0, max: 1, step: 0.01, def: 0.35 },
-        { key: "fade",     label: "Fade Speed",     min: 0.2, max: 2.5, step: 0.05, def: 1.0 },
+        { key:"width", label:"Ribbon Width", min:6, max:44, step:1, def:20, mod:0.15 },
+        { key:"spring", label:"Springiness", min:0.02, max:0.25, step:0.01, def:0.10, mod:0.14 },
+        { key:"smooth", label:"Smoothness", min:0.05, max:0.55, step:0.01, def:0.22, mod:0.14 },
+        { key:"glitter", label:"Glitter", min:0, max:1, step:0.01, def:0.35, mod:0.22 },
+        { key:"fade", label:"Fade Speed", min:0.2, max:2.5, step:0.05, def:1.0, mod:0.12 },
       ],
-      onDown(x,y,meta){
-        ensureRibbon(meta.pointerId, x, y);
-        burstSparkles(x,y, 10);
-      },
+      onDown(x,y,meta){ ensureRibbon(meta.pointerId, x, y); burstSparkles(x,y, 10); playChime(0.55); },
       onMove(x,y,meta){
         ensureRibbon(meta.pointerId, x, y);
         if (p("glitter") > 0.01 && meta.speed > 2) {
           burstSparkles(x,y, Math.floor(clamp(meta.speed/2, 2, 10) * p("glitter")));
+          if (meta.speed > 9) playTone(rand(520, 1000), 0.025, "sine", 0.015);
         }
       },
-      onUp(_,__,meta){ /* let it fade naturally */ },
-      drawBackground(){ drawSoftBackground(); },
       drawOverlay(){ drawRibbons(); }
     },
   ];
 
-  // Active effect + params storage
   let activeEffectId = effects[0].id;
-  const effectParams = Object.fromEntries(effects.map(e => [e.id, Object.fromEntries(e.sliders.map(s => [s.key, s.def]))]));
+  const effectParams = Object.fromEntries(
+    effects.map(e => [e.id, Object.fromEntries(e.sliders.map(s => [s.key, s.def]))])
+  );
   function p(key){ return effectParams[activeEffectId][key]; }
 
-  // Populate select
+  // Build effect select
   for (const e of effects) {
     const opt = document.createElement("option");
     opt.value = e.id;
@@ -338,20 +458,10 @@
   }
   effectSelect.value = activeEffectId;
 
-  function setEffect(id) {
-    activeEffectId = id;
-    buildSliders();
-    pokeUI();
-    // friendly “burst” on effect switch (fun feedback)
-    const x = innerWidth * 0.5, y = innerHeight * 0.35;
-    burstStars(x, y, 24, 1.0);
-  }
-
-  effectSelect.onchange = () => setEffect(effectSelect.value);
-
   function buildSliders() {
     slidersEl.innerHTML = "";
     const effect = effects.find(e => e.id === activeEffectId);
+
     for (const s of effect.sliders) {
       const wrap = document.createElement("div");
       wrap.className = "slider";
@@ -359,6 +469,7 @@
       const left = document.createElement("div");
       const label = document.createElement("label");
       label.textContent = s.label;
+
       const range = document.createElement("input");
       range.type = "range";
       range.min = s.min; range.max = s.max; range.step = s.step;
@@ -374,7 +485,6 @@
       range.oninput = () => {
         effectParams[activeEffectId][s.key] = Number(range.value);
         val.textContent = fmt(Number(range.value), s.step);
-        pokeUI();
       };
 
       wrap.appendChild(left);
@@ -382,37 +492,82 @@
       slidersEl.appendChild(wrap);
     }
   }
-  buildSliders();
 
-  // ---------- Input handling (multi-touch) ----------
-  const pointers = new Map(); // id -> {x,y,px,py}
-  const perPointerMeta = new Map(); // id -> effect-specific meta (accumulators etc.)
+  function setEffect(id) {
+    activeEffectId = id;
+    effectSelect.value = id;
+    buildSliders();
+
+    // friendly feedback
+    const x = innerWidth * 0.5, y = innerHeight * 0.33;
+    burstStars(x, y, 24, 1.0);
+    if (soundEnabled) playChime(0.75);
+  }
+
+  effectSelect.onchange = () => setEffect(effectSelect.value);
+
+  // Buttons
+  document.getElementById("clearBtn").onclick = () => {
+    state.particles.length = 0;
+    state.blobs.length = 0;
+    state.bubbles.length = 0;
+    state.trails.clear();
+    state.ribbons.clear();
+  };
+
+  document.getElementById("randomizeBtn").onclick = () => {
+    gentleShuffleSliders(activeEffectId);
+    buildSliders();
+    burstStars(innerWidth*0.5, innerHeight*0.3, 18, 0.9);
+    playChime(0.65);
+  };
+
+  function gentleShuffleSliders(effectId) {
+    const effect = effects.find(e => e.id === effectId);
+    for (const s of effect.sliders) {
+      const v = effectParams[effectId][s.key];
+      const t = rand(-1, 1) * (s.max - s.min) * 0.06;
+      effectParams[effectId][s.key] = clamp(v + t, s.min, s.max);
+    }
+  }
+
+  // ---------------- Input handling ----------------
+  const pointers = new Map();       // id -> {x,y}
+  const perPointerMeta = new Map(); // id -> {pointerId, emitAcc, ...}
+
   const state = {
     particles: [],
     blobs: [],
     bubbles: [],
-    trails: new Map(),   // id -> points
-    ribbons: new Map(),  // id -> ribbon object
+    trails: new Map(),
+    ribbons: new Map(),
   };
 
-  // Avoid painting when touching UI:
   function isOverUI(target) {
-    return target.closest && target.closest("#panel");
+    return target.closest && (target.closest("#pane") || target.closest("#paneToggle"));
   }
 
   canvas.addEventListener("pointerdown", (e) => {
     if (isOverUI(e.target)) return;
-    canvas.setPointerCapture(e.pointerId);
 
+    // Prime audio on first gesture (required on iOS)
+    if (!audioPrimed && soundEnabled) {
+      ensureAudio();
+      // tiny “hello” chime
+      playChime(0.35);
+    }
+
+    hintTimer = 2.0;
+    hint.classList.add("hidden");
+
+    canvas.setPointerCapture(e.pointerId);
     const x = e.clientX, y = e.clientY;
-    pointers.set(e.pointerId, { x, y, px: x, py: y });
+    pointers.set(e.pointerId, { x, y });
     perPointerMeta.set(e.pointerId, { pointerId: e.pointerId });
 
-    // Trail points (used by some effects)
     state.trails.set(e.pointerId, [{ x, y, t: performance.now() }]);
 
-    pokeUI();
-    callEffectHandler("onDown", x, y, e.pointerId, 0, 0, 0);
+    callEffect("onDown", x, y, e.pointerId, 0, 0, 0);
     e.preventDefault();
   }, { passive: false });
 
@@ -424,12 +579,11 @@
     const vx = x - pnt.x;
     const vy = y - pnt.y;
     const dist = Math.hypot(vx, vy);
-    const speed = dist; // pixels per move; good enough for “feel”
+    const speed = dist;
 
-    pnt.px = pnt.x; pnt.py = pnt.y;
     pnt.x = x; pnt.y = y;
 
-    // Update trail with smoothing
+    // trail points
     const tr = state.trails.get(e.pointerId);
     if (tr) {
       const last = tr[tr.length - 1];
@@ -437,7 +591,7 @@
       const d = Math.hypot(dx, dy);
       const steps = Math.floor(d / 10);
       const now = performance.now();
-      for (let i=1; i<=steps; i++) {
+      for (let i=1;i<=steps;i++) {
         const tt = i/(steps+1);
         tr.push({ x: last.x + dx*tt, y: last.y + dy*tt, t: now });
       }
@@ -445,8 +599,7 @@
       while (tr.length > 42) tr.shift();
     }
 
-    pokeUI();
-    callEffectHandler("onMove", x, y, e.pointerId, speed, dist, 0);
+    callEffect("onMove", x, y, e.pointerId, speed, dist, dtGlobal);
     e.preventDefault();
   }, { passive: false });
 
@@ -455,19 +608,17 @@
     const pnt = pointers.get(e.pointerId);
     pointers.delete(e.pointerId);
 
-    callEffectHandler("onUp", pnt?.x ?? 0, pnt?.y ?? 0, e.pointerId, 0, 0, 0);
+    callEffect("onUp", pnt?.x ?? 0, pnt?.y ?? 0, e.pointerId, 0, 0, dtGlobal);
 
-    // let trails/ribbons fade; cleanup later
     setTimeout(() => {
       state.trails.delete(e.pointerId);
       perPointerMeta.delete(e.pointerId);
-      // ribbons are kept to fade (handled in drawRibbons)
     }, 900);
   }
   canvas.addEventListener("pointerup", endPointer, { passive: true });
   canvas.addEventListener("pointercancel", endPointer, { passive: true });
 
-  function callEffectHandler(method, x, y, pointerId, speed, dist, dt) {
+  function callEffect(method, x, y, pointerId, speed, dist, dt) {
     const effect = effects.find(e => e.id === activeEffectId);
     const meta = perPointerMeta.get(pointerId) || { pointerId };
     meta.speed = speed;
@@ -475,87 +626,90 @@
     meta.dt = dt;
     perPointerMeta.set(pointerId, meta);
 
-    if (effect && typeof effect[method] === "function") {
-      effect[method](x, y, meta);
-    }
+    if (effect && typeof effect[method] === "function") effect[method](x, y, meta);
   }
 
-  // ---------- Visual systems ----------
-  // Sparkle dots
+  // ---------------- Visual systems ----------------
   function burstSparkles(x,y,count) {
     for (let i=0;i<count;i++) {
       const a = rand(0, Math.PI*2);
       const s = rand(0.6, 4.2);
       state.particles.push({
-        kind: "sparkle",
-        x, y,
-        vx: Math.cos(a)*s,
-        vy: Math.sin(a)*s,
-        r: rand(1.2, 3.2),
-        life: rand(0.25, 0.9),
-        hue: rand(40, 70),
-        tw: rand(0, Math.PI*2),
+        kind:"sparkle",
+        x,y, vx:Math.cos(a)*s, vy:Math.sin(a)*s,
+        r:rand(1.2, 3.2),
+        life:rand(0.25, 0.9),
+        hue:rand(40, 70),
+        tw:rand(0, Math.PI*2),
       });
     }
   }
 
-  // Star “confetti” (tiny stars)
   function burstStars(x,y,count,scale=1) {
     for (let i=0;i<count;i++) {
       const a = rand(0, Math.PI*2);
       const s = rand(0.8, 4.6) * scale;
       state.particles.push({
-        kind: "tinyStar",
-        x, y,
-        vx: Math.cos(a)*s,
-        vy: Math.sin(a)*s,
-        size: rand(3, 8) * scale,
-        rot: rand(0, Math.PI*2),
-        vr: rand(-3, 3),
-        life: rand(0.35, 1.1),
-        hue: rand(40, 80),
+        kind:"tinyStar",
+        x,y, vx:Math.cos(a)*s, vy:Math.sin(a)*s,
+        size:rand(3, 8) * scale,
+        rot:rand(0, Math.PI*2),
+        vr:rand(-3, 3),
+        life:rand(0.35, 1.1),
+        hue:rand(40, 80),
       });
     }
   }
 
-  // Goo blobs
   function dropBlob(x,y,meta,strength=1) {
-    const base = (effectParams[activeEffectId]?.size ?? 24);
+    const base = effectParams[activeEffectId]?.size ?? 24;
     state.blobs.push({
-      x, y,
-      r: rand(base*0.55, base*1.15) * strength,
-      vx: rand(-0.9, 0.9) * strength,
-      vy: rand(-0.9, 0.9) * strength,
-      life: rand(0.7, 1.5),
-      hue: rand(260, 320),
+      x,y,
+      r:rand(base*0.55, base*1.15) * strength,
+      vx:rand(-0.9, 0.9) * strength,
+      vy:rand(-0.9, 0.9) * strength,
+      life:rand(0.7, 1.5),
+      hue:rand(260, 320),
     });
-    if ((meta?.speed ?? 0) > 10) {
-      // little extra delight when moving fast
-      burstStars(x,y, 2, 0.7);
-    }
+    if ((meta?.speed ?? 0) > 12) burstStars(x,y, 2, 0.7);
   }
 
-  // Burst star stamps (big star shape)
+  function drawBigStar(x,y,points,rOuter,rInner,rot,fillStyle,alpha=1) {
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(rot);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = fillStyle;
+    ctx.beginPath();
+    for (let i=0;i<points*2;i++) {
+      const r = (i%2===0) ? rOuter : rInner;
+      const ang = (i/(points*2)) * Math.PI*2;
+      ctx.lineTo(Math.cos(ang)*r, Math.sin(ang)*r);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
   function spawnBurstStar(x,y,scale=1) {
+    const effect = effects.find(e => e.id === activeEffectId);
     const points = Math.round(p("points"));
     const radius = p("radius") * scale;
     const wobble = p("wobble");
-    const hue = rand(35, 70);
     state.particles.push({
-      kind: "bigStar",
-      x, y,
+      kind:"bigStar",
+      x,y,
       points,
       radius,
       inner: radius * rand(0.35, 0.55),
       wobble,
-      rot: rand(0, Math.PI*2),
-      vr: rand(-1.5, 1.5),
-      life: rand(0.45, 1.3),
-      hue,
+      rot:rand(0, Math.PI*2),
+      vr:rand(-1.5, 1.5),
+      life:rand(0.45, 1.3),
+      hue:rand(35, 70),
     });
   }
 
-  // Firework pop (many particles with chosen size/count)
   function fireworkPop(x,y,scale=1) {
     const count = Math.round(p("count"));
     const spread = p("spread");
@@ -564,55 +718,124 @@
       const a = rand(0, Math.PI*2);
       const sp = rand(0.8, 6.0) * spread;
       state.particles.push({
-        kind: "fw",
-        x, y,
-        vx: Math.cos(a)*sp,
-        vy: Math.sin(a)*sp,
-        r: rand(1.2, 3.0) * (popSize/48),
-        life: rand(0.35, 1.0),
-        hue: rand(180, 330),
-        glow: p("glow"),
+        kind:"fw",
+        x,y,
+        vx:Math.cos(a)*sp,
+        vy:Math.sin(a)*sp,
+        r:rand(1.2, 3.0) * (popSize/48),
+        life:rand(0.35, 1.0),
+        hue:rand(180, 330),
+        glow:p("glow"),
       });
     }
     burstStars(x,y, 10, 1.0);
   }
 
-  // Bubbles
-  function spawnBubble(x,y,scale=1) {
-    const sz = p("bubbleSize") * scale;
-    state.bubbles.push({
-      x, y,
-      r: rand(sz*0.7, sz*1.1),
-      vy: rand(-1.0, -2.2) * p("rise"),
-      vx: rand(-0.4, 0.4),
-      life: rand(1.2, 2.6),
-      phase: rand(0, Math.PI*2),
-    });
+function spawnBubble(x,y,scale=1) {
+  const sz = p("bubbleSize") * scale;
+  state.bubbles.push({
+    x,y,
+    r:rand(sz*0.7, sz*1.1),
+    vy:rand(-1.0, -2.2) * p("rise"),
+    vx:rand(-0.4, 0.4),
+    life:rand(1.2, 2.6),
+    phase:rand(0, Math.PI*2),
+  });
+
+  // NEW: bubble creation sound
+  playBubbleBlip( lerp(0.35, 0.9, clamp(scale, 0.6, 1.4) - 0.6) );
+}
+
+  function drawBubbles() {
+    ctx.save();
+    for (const b of state.bubbles) {
+      const a = clamp(b.life/0.6, 0, 1) * 0.7;
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = "rgba(200,240,255,0.55)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+      ctx.stroke();
+
+      ctx.globalAlpha = a * 0.5;
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.beginPath();
+      ctx.arc(b.x - b.r*0.25, b.y - b.r*0.25, b.r*0.25, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
   }
 
-  // Ribbon system
   function ensureRibbon(pointerId, x, y) {
     if (!state.ribbons.has(pointerId)) {
       state.ribbons.set(pointerId, {
-        x, y, vx: 0, vy: 0,
-        points: [{x,y,a:1}],
-        hue: rand(0, 360),
+        x,y, vx:0, vy:0,
+        targetX:x, targetY:y,
+        points:[{x,y,a:1}],
+        hue:rand(0,360),
       });
     }
     const r = state.ribbons.get(pointerId);
-    if (!r) return;
     r.targetX = x;
     r.targetY = y;
   }
 
-  // ---------- Drawing helpers ----------
+  function drawRibbons() {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const [id, r] of state.ribbons.entries()) {
+      const spring = p("spring");
+      const smooth = p("smooth");
+      const fade = p("fade");
+
+      if (r.targetX != null) {
+        const ax = (r.targetX - r.x) * spring;
+        const ay = (r.targetY - r.y) * spring;
+        r.vx = (r.vx + ax) * (1 - smooth);
+        r.vy = (r.vy + ay) * (1 - smooth);
+        r.x += r.vx * 60 * dtGlobal;
+        r.y += r.vy * 60 * dtGlobal;
+        r.points.push({ x:r.x, y:r.y, a:1 });
+        while (r.points.length > 60) r.points.shift();
+      }
+
+      for (const pt of r.points) pt.a -= dtGlobal * fade * 0.8;
+      while (r.points.length && r.points[0].a <= 0) r.points.shift();
+
+      if (r.points.length < 2) {
+        if (!pointers.has(id)) state.ribbons.delete(id);
+        continue;
+      }
+
+      const w = p("width");
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      ctx.beginPath();
+      ctx.moveTo(r.points[0].x, r.points[0].y);
+      for (let i=1;i<r.points.length;i++) ctx.lineTo(r.points[i].x, r.points[i].y);
+
+      ctx.lineWidth = w;
+      ctx.strokeStyle = `hsla(${r.hue}, 95%, 70%, 0.22)`;
+      ctx.stroke();
+
+      ctx.lineWidth = Math.max(2, w*0.55);
+      ctx.strokeStyle = `hsla(${(r.hue+60)%360}, 95%, 75%, 0.28)`;
+      ctx.stroke();
+
+      r.hue = (r.hue + dtGlobal * 90) % 360;
+    }
+    ctx.restore();
+  }
+
   function drawSoftBackground() {
     ctx.clearRect(0, 0, innerWidth, innerHeight);
     ctx.fillStyle = "#050510";
     ctx.fillRect(0, 0, innerWidth, innerHeight);
 
-    // subtle “night glow”
-    const g = ctx.createRadialGradient(innerWidth*0.5, innerHeight*0.35, 30, innerWidth*0.5, innerHeight*0.35, Math.max(innerWidth, innerHeight)*0.7);
+    const g = ctx.createRadialGradient(innerWidth*0.5, innerHeight*0.35, 30,
+                                       innerWidth*0.5, innerHeight*0.35, Math.max(innerWidth, innerHeight)*0.7);
     g.addColorStop(0, "rgba(180,120,255,0.10)");
     g.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = g;
@@ -649,11 +872,10 @@
     ctx.restore();
   }
 
-  function drawGoo() {
-    const blur = effectParams[activeEffectId]?.blur ?? 12;
-    gtx.clearRect(0, 0, innerWidth, innerHeight);
+  function drawGoo(blurPx=12) {
+    gtx.clearRect(0,0,innerWidth,innerHeight);
     gtx.save();
-    gtx.filter = `blur(${Math.max(0, blur)}px)`;
+    gtx.filter = `blur(${Math.max(0, blurPx)}px)`;
     gtx.globalCompositeOperation = "lighter";
 
     for (const b of state.blobs) {
@@ -670,7 +892,6 @@
     ctx.drawImage(gooCanvas, 0, 0, innerWidth, innerHeight);
     ctx.restore();
 
-    // shiny highlights
     ctx.save();
     ctx.globalCompositeOperation = "screen";
     ctx.globalAlpha = 0.25;
@@ -683,106 +904,54 @@
     ctx.restore();
   }
 
-  function drawBigStar(x,y,points,rOuter,rInner,rot,fillStyle,alpha=1) {
-    ctx.save();
-    ctx.translate(x,y);
-    ctx.rotate(rot);
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = fillStyle;
+  // ---------------- Auto slider modulation ----------------
+  // Drifts values slowly, and “reacts” slightly to activity (particle count).
+  const modPhase = new Map(); // key -> phase
+  function modulateSliders(dt) {
+    if (!autoSliders) return;
 
-    ctx.beginPath();
-    for (let i=0;i<points*2;i++) {
-      const r = (i%2===0) ? rOuter : rInner;
-      const a = (i/(points*2)) * Math.PI*2;
-      ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+    const effect = effects.find(e => e.id === activeEffectId);
+    const params = effectParams[activeEffectId];
+    const activity = clamp((state.particles.length + state.blobs.length + state.bubbles.length) / 220, 0, 1);
+
+    for (const s of effect.sliders) {
+      const key = `${activeEffectId}:${s.key}`;
+      const ph = (modPhase.get(key) ?? rand(0, Math.PI*2)) + dt * (0.35 + activity*0.9);
+      modPhase.set(key, ph);
+
+      const amp = (s.mod ?? 0.12) * (1 + activity*0.6) * (s.max - s.min);
+      const center = params[s.key];
+      const drift = Math.sin(ph) * amp * 0.10;
+
+      // rare tiny nudges
+      const jitter = (Math.random() < dt * 0.25) ? rand(-1,1) * amp * 0.02 : 0;
+
+      params[s.key] = clamp(center + drift + jitter, s.min, s.max);
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
   }
 
-  function drawBubbles() {
-    ctx.save();
-    for (const b of state.bubbles) {
-      const a = clamp(b.life/0.6, 0, 1) * 0.7;
-      ctx.globalAlpha = a;
-      // outer
-      ctx.strokeStyle = "rgba(200,240,255,0.55)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
-      ctx.stroke();
-      // inner shine
-      ctx.globalAlpha = a * 0.5;
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
-      ctx.beginPath();
-      ctx.arc(b.x - b.r*0.25, b.y - b.r*0.25, b.r*0.25, 0, Math.PI*2);
-      ctx.fill();
-      ctx.globalAlpha = a;
-    }
-    ctx.restore();
+  // Keep slider UI in sync while pane open
+  function syncSliderUIIfOpen() {
+    if (!paneOpen) return;
+    buildSliders(); // simple + okay for small slider count
   }
 
-  function drawRibbons() {
-    // Each pointer ribbon is a spring toward its target; points fade over time
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
+  // ---------------- Auto-cycle effects ----------------
+  let cycleTimer = 0;
+  const CYCLE_SECONDS = 10; // change this if you want longer/shorter
 
-    for (const [id, r] of state.ribbons.entries()) {
-      if (!r) continue;
-
-      const spring = p("spring");
-      const smooth = p("smooth");
-      const fade = p("fade");
-
-      if (r.targetX != null) {
-        const ax = (r.targetX - r.x) * spring;
-        const ay = (r.targetY - r.y) * spring;
-        r.vx = (r.vx + ax) * (1 - smooth);
-        r.vy = (r.vy + ay) * (1 - smooth);
-        r.x += r.vx * 60 * dtGlobal;
-        r.y += r.vy * 60 * dtGlobal;
-
-        r.points.push({ x: r.x, y: r.y, a: 1 });
-        while (r.points.length > 60) r.points.shift();
-      }
-
-      // fade points
-      for (const pt of r.points) pt.a -= dtGlobal * fade * 0.8;
-      while (r.points.length && r.points[0].a <= 0) r.points.shift();
-
-      if (r.points.length < 2) continue;
-
-      const w = p("width");
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = w;
-
-      // draw in segments with shifting hue
-      ctx.beginPath();
-      ctx.moveTo(r.points[0].x, r.points[0].y);
-      for (let i=1;i<r.points.length;i++) ctx.lineTo(r.points[i].x, r.points[i].y);
-
-      // Use a gradient-ish stroke by drawing twice:
-      ctx.strokeStyle = `hsla(${r.hue}, 95%, 70%, 0.22)`;
-      ctx.stroke();
-      ctx.lineWidth = Math.max(2, w*0.55);
-      ctx.strokeStyle = `hsla(${(r.hue+60)%360}, 95%, 75%, 0.28)`;
-      ctx.stroke();
-
-      r.hue = (r.hue + dtGlobal * 90) % 360;
-
-      // cleanup ribbon if inactive pointer and fully faded
-      if (!pointers.has(id) && r.points.length === 0) state.ribbons.delete(id);
+  function maybeCycle(dt) {
+    if (!autoCycle) return;
+    cycleTimer += dt;
+    if (cycleTimer >= CYCLE_SECONDS) {
+      cycleTimer = 0;
+      const idx = effects.findIndex(e => e.id === activeEffectId);
+      const next = effects[(idx + 1) % effects.length].id;
+      setEffect(next);
     }
-
-    ctx.restore();
   }
 
-  // ---------- Update loop ----------
-  let last = performance.now();
-  let dtGlobal = 0.016;
-
+  // ---------------- Simulation update ----------------
   function update(dt) {
     // blobs
     for (let i=state.blobs.length-1;i>=0;i--) {
@@ -793,8 +962,9 @@
       b.vx *= (1 - 1.8 * dt);
       b.vy *= (1 - 1.8 * dt);
 
-      const grav = effectParams[activeEffectId]?.gravity ?? -0.25;
-      b.vy += grav * dt; // negative = float up
+      // floatiness param (negative floats upward)
+      const float = (effectParams[activeEffectId]?.float ?? -0.25);
+      b.vy += float * dt;
 
       b.r *= (0.996 + 0.002 * clamp(b.life/0.35,0,1));
       if (b.life <= 0 || b.r < 2) state.blobs.splice(i,1);
@@ -804,14 +974,14 @@
     for (let i=state.bubbles.length-1;i>=0;i--) {
       const b = state.bubbles[i];
       b.life -= dt;
-      b.phase += dt * (0.8 + p("wiggle")*3.0);
-      b.x += (b.vx + Math.sin(b.phase) * 0.8 * p("wiggle")) * 60 * dt;
+      b.phase += dt * (0.8 + (p("wiggle") || 0) * 3.0);
+      b.x += (b.vx + Math.sin(b.phase) * 0.8 * (p("wiggle") || 0)) * 60 * dt;
       b.y += b.vy * 60 * dt;
 
-      // pop at top or end of life
       if (b.y + b.r < -10 || b.life <= 0) {
-        if (p("popSpark") > 0.01) burstSparkles(b.x, b.y, Math.floor(16 * p("popSpark")));
+        if (activeEffectId === "bubbles" && (p("popSpark") || 0) > 0.01) burstSparkles(b.x, b.y, Math.floor(16 * p("popSpark")));
         burstStars(b.x, b.y, 8, 0.8);
+        playPop(0.4);
         state.bubbles.splice(i,1);
       }
     }
@@ -838,7 +1008,7 @@
       } else if (pt.kind === "bigStar") {
         pt.rot += pt.vr * dt;
       } else if (pt.kind === "fw") {
-        const drag = p("drag") ?? 0.10;
+        const drag = (p("drag") ?? 0.10);
         pt.x += pt.vx * 60 * dt;
         pt.y += pt.vy * 60 * dt;
         pt.vx *= (1 - drag);
@@ -849,30 +1019,28 @@
       if (pt.life <= 0) state.particles.splice(i,1);
     }
 
-    // toddler mode auto-hide
-    if (toddlerMode) {
-      const idle = performance.now() - lastInteractionAt;
-      if (idle > UI_HIDE_MS) {
-        panel.classList.add("hidden");
-        hint.classList.add("hidden");
-      }
+    // auto modulation + cycling
+    modulateSliders(dt);
+    maybeCycle(dt);
+
+    // update slider UI only if pane open
+    syncSliderUIIfOpen();
+
+    // hint fade
+    if (hintTimer > 0) {
+      hintTimer -= dt;
+      if (hintTimer <= 0) hint.classList.add("hidden");
     }
   }
 
   function draw() {
+    drawSoftBackground();
+
+    // effect overlay
     const effect = effects.find(e => e.id === activeEffectId);
-    (effect?.drawBackground || drawSoftBackground)();
-
-    // Some effects use goo
-    if (activeEffectId === "sparklyGoo" && p("goo") > 0.01) drawGoo();
-
-    // bubbles
-    if (activeEffectId === "bubbles") drawBubbles();
-
-    // overlay trails/ribbons
     effect?.drawOverlay?.();
 
-    // draw particles
+    // Draw particles
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
 
@@ -889,11 +1057,10 @@
         drawBigStar(pt.x, pt.y, 5, pt.size, pt.size*0.5, pt.rot, `hsla(${pt.hue},95%,70%,${a})`, 1);
       } else if (pt.kind === "bigStar") {
         const a = clamp(pt.life / 0.45, 0, 1);
-        const wob = pt.wobble;
+        const wob = pt.wobble ?? 0.3;
         const rr = pt.radius * (1 + Math.sin(performance.now()*0.003 + pt.rot) * 0.08 * wob);
         const ri = pt.inner  * (1 + Math.cos(performance.now()*0.003 + pt.rot) * 0.10 * wob);
         drawBigStar(pt.x, pt.y, pt.points, rr, ri, pt.rot, `hsla(${pt.hue},95%,68%,${a})`, 1);
-        // soft glow ring
         ctx.globalAlpha = a * 0.25;
         ctx.strokeStyle = `hsla(${pt.hue},95%,80%,1)`;
         ctx.lineWidth = 2;
@@ -909,28 +1076,50 @@
         ctx.fill();
       }
     }
+
     ctx.restore();
 
+    // bubbles drawn by overlay in bubble effect
     drawVignette();
   }
 
+  // ---------------- Animation loop ----------------
+  let last = performance.now();
+  let dtGlobal = 0.016;
+
   function frame(now) {
-    const dt = Math.min(0.033, (now - last) / 1000);
-    dtGlobal = dt;
+    dtGlobal = Math.min(0.033, (now - last)/1000);
     last = now;
 
-    // Let effects use dt in per-pointer meta
-    for (const [id, meta] of perPointerMeta.entries()) meta.dt = dt;
+    // provide dt to pointer meta
+    for (const meta of perPointerMeta.values()) meta.dt = dtGlobal;
 
-    update(dt);
+    update(dtGlobal);
     draw();
 
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
-  // start effect
+  // ---------------- Initial UI state ----------------
+  function populateEffectSelect() {
+    effectSelect.innerHTML = "";
+    for (const e of effects) {
+      const opt = document.createElement("option");
+      opt.value = e.id;
+      opt.textContent = e.name;
+      effectSelect.appendChild(opt);
+    }
+  }
+  populateEffectSelect();
   setEffect(activeEffectId);
+  buildSliders();
+  setPaneOpen(false);
+
+  // If user taps empty space, show hint briefly (optional)
+  canvas.addEventListener("pointerdown", () => {
+    hint.classList.add("hidden");
+  }, { passive: true });
 })();
 </script>
 </body>
