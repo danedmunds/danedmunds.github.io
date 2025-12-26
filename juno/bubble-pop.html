@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v4)</title>
+  <title>Bubble Pop! (v5)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -111,6 +111,7 @@
   };
 
   function updateScore(points) {
+    const oldScore = score;
     score += points;
     scoreEl.textContent = score;
     
@@ -122,6 +123,78 @@
       comboEl.textContent = `${combo}x COMBO!`;
       comboEl.classList.add("active");
     }
+    
+    // Celebratory confetti on milestones
+    checkMilestones(oldScore, score, combo);
+  }
+
+  // Confetti celebration effects
+  function spawnConfetti(x, y, amount, spreadX = 300, spreadY = 400) {
+    for (let i = 0; i < amount; i++) {
+      const angle = rand(-Math.PI/3, -Math.PI*2/3); // Upward spray
+      const speed = rand(8, 18);
+      const shapeType = Math.floor(Math.random() * 4);
+      let kind;
+      if (shapeType === 0) kind = "confetti";
+      else if (shapeType === 1) kind = "star";
+      else if (shapeType === 2) kind = "circle";
+      else kind = "diamond";
+      
+      state.particles.push({
+        kind,
+        x: x + rand(-spreadX/2, spreadX/2),
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        w: kind === "confetti" ? rand(3, 6) : undefined,
+        h: kind === "confetti" ? rand(8, 14) : undefined,
+        r: kind === "circle" ? rand(3, 7) : undefined,
+        size: (kind === "star" || kind === "diamond") ? rand(4, 9) : undefined,
+        rot: rand(0, Math.PI*2),
+        vr: rand(-20, 20),
+        twinkle: kind === "star" ? rand(0, Math.PI*2) : undefined,
+        life: rand(1.2, 2.0),
+        hue: rand(0, 360),
+        gravity: 1.4,
+        fadeType: Math.floor(Math.random() * 3),
+      });
+    }
+  }
+
+  function checkMilestones(oldScore, newScore, currentCombo) {
+    const milestones = [100, 250, 500, 1000, 2000, 5000, 10000];
+    
+    // Score milestone confetti
+    for (const milestone of milestones) {
+      if (oldScore < milestone && newScore >= milestone) {
+        // Big celebration at screen center
+        spawnConfetti(innerWidth / 2, innerHeight * 0.3, 80, 400, 300);
+        playCheer(1.0);
+        break;
+      }
+    }
+    
+    // Combo milestone confetti
+    if (currentCombo === 5 || currentCombo === 10 || currentCombo === 15 || 
+        currentCombo === 20 || currentCombo === 30 || currentCombo === 50) {
+      spawnConfetti(innerWidth / 2, innerHeight * 0.4, 60, 350, 250);
+      playCheer(0.8);
+    }
+    
+    // Smaller confetti for every 5 combo after 10
+    else if (currentCombo > 10 && currentCombo % 5 === 0) {
+      spawnConfetti(innerWidth / 2, innerHeight * 0.5, 30, 250, 200);
+      playCheer(0.6);
+    }
+  }
+
+  function playCheer(intensity = 1.0) {
+    if (!audioPrimed) return;
+    // Ascending chime celebration
+    const baseFreq = 520;
+    playTone(baseFreq * intensity, 0.08, "sine", 0.12);
+    setTimeout(() => playTone(baseFreq * 1.25 * intensity, 0.08, "sine", 0.14), 60);
+    setTimeout(() => playTone(baseFreq * 1.5 * intensity, 0.10, "sine", 0.16), 120);
   }
 
   function bubbleEscaped() {
@@ -145,6 +218,11 @@
         // If popping 90%+ of bubbles, increase difficulty
         if (successRate >= 0.9 && difficultyLevel < 3.0) {
           difficultyLevel += 0.2;
+          // Celebrate perfect or near-perfect performance!
+          if (successRate >= 0.95) {
+            spawnConfettiCannons(100);
+            playCheer(1.2);
+          }
         }
         // If missing 50%+ of bubbles, decrease difficulty
         else if (successRate < 0.5 && difficultyLevel > 0.5) {
@@ -163,6 +241,16 @@
       bubblesPopped = 0;
       bubblesEscaped = 0;
     }
+  }
+
+  // Confetti cannons from screen edges
+  function spawnConfettiCannons(amount) {
+    // Left cannon
+    spawnConfetti(50, innerHeight * 0.6, amount / 2, 100, 400);
+    // Right cannon
+    setTimeout(() => {
+      spawnConfetti(innerWidth - 50, innerHeight * 0.6, amount / 2, 100, 400);
+    }, 150);
   }
 
   // ---------------- Sound (Web Audio) ----------------
@@ -680,10 +768,49 @@
 
       if (dist < b.r) {
         explodeBubble(b);
-        updateScore(b.type.points * Math.max(1, combo));
+        const pointsEarned = b.type.points * Math.max(1, combo);
+        updateScore(pointsEarned);
+        
+        // Extra confetti for high-value pops
+        if (b.type.points >= 30) {
+          // Tiny or Giant bubbles get extra celebration
+          spawnMiniConfetti(b.x, b.y, 20);
+        }
+        
+        // Big confetti for huge combo multipliers
+        if (combo >= 15) {
+          spawnMiniConfetti(b.x, b.y, 15);
+        }
+        
         state.bubbles.splice(i, 1);
         break;
       }
+    }
+  }
+
+  // Mini confetti burst at pop location
+  function spawnMiniConfetti(x, y, amount) {
+    for (let i = 0; i < amount; i++) {
+      const angle = rand(0, Math.PI * 2);
+      const speed = rand(4, 10);
+      const shapeType = Math.floor(Math.random() * 3);
+      let kind = shapeType === 0 ? "star" : (shapeType === 1 ? "diamond" : "circle");
+      
+      state.particles.push({
+        kind,
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        r: kind === "circle" ? rand(2, 4) : undefined,
+        size: kind !== "circle" ? rand(3, 6) : undefined,
+        rot: rand(0, Math.PI*2),
+        vr: rand(-15, 15),
+        twinkle: kind === "star" ? rand(0, Math.PI*2) : undefined,
+        life: rand(0.4, 0.8),
+        hue: rand(0, 360),
+        gravity: 1.0,
+        fadeType: 2,
+      });
     }
   }
 
