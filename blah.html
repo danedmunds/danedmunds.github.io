@@ -155,6 +155,10 @@
       transition: opacity 220ms ease;
     }
     .hint.hidden { opacity: 0; }
+    /* Let the settings UI handle touches normally */
+    #pane, #pane * {
+    touch-action: manipulation; /* or: auto */
+    }
   </style>
 </head>
 <body>
@@ -247,6 +251,7 @@
     paneOpen = open;
     pane.classList.toggle("closed", !open);
     paneToggle.textContent = open ? "❯" : "❮";
+    canvas.style.pointerEvents = open ? "none" : "auto";
   }
   paneToggle.onclick = (e) => {
     e.stopPropagation();
