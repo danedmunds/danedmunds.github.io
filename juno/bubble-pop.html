@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v14)</title>
+  <title>Bubble Pop! (v15)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -182,37 +182,129 @@
     o.stop(t0 + dur + 0.02);
   }
 
-  // Different pop sounds
-  function playPopSound(type) {
-    switch(type) {
-      case 0: // Soft pop
-        playTone(rand(300, 500), 0.08, "sine", 0.15);
-        break;
-      case 1: // Sharp pop
-        playTone(rand(600, 900), 0.05, "triangle", 0.18);
-        setTimeout(() => playTone(rand(400, 600), 0.04, "sine", 0.12), 20);
-        break;
-      case 2: // Deep boom
-        playTone(rand(120, 200), 0.12, "sawtooth", 0.20);
-        setTimeout(() => playTone(rand(80, 120), 0.08, "triangle", 0.15), 30);
-        break;
-      case 3: // Sparkly
-        playTone(rand(800, 1200), 0.04, "sine", 0.14);
-        setTimeout(() => playTone(rand(1000, 1600), 0.03, "sine", 0.10), 15);
-        setTimeout(() => playTone(rand(1200, 1800), 0.025, "sine", 0.08), 30);
-        break;
-      case 4: // Wobble
-        playTone(rand(250, 350), 0.10, "sine", 0.16);
-        setTimeout(() => playTone(rand(180, 280), 0.08, "sine", 0.14), 40);
-        break;
-      case 5: // Whistle
-        playTone(rand(1500, 2200), 0.06, "sine", 0.12);
-        break;
-      case 6: // Crackle
-        playTone(rand(400, 700), 0.03, "square", 0.14);
-        setTimeout(() => playTone(rand(300, 600), 0.025, "sawtooth", 0.12), 20);
-        break;
+  // ---------------- Musical Songs System ----------------
+  const songs = [
+    {
+      name: "Twinkle Twinkle Little Star",
+      // C C G G A A G F F E E D D C G G F F E E D G G F F E E D C C G G A A G F F E E D D C
+      notes: [
+        262, 262, 392, 392, 440, 440, 392, // Twinkle twinkle little star
+        349, 349, 330, 330, 294, 294, 262, // How I wonder what you are
+        392, 392, 349, 349, 330, 330, 294, // Up above the world so high
+        392, 392, 349, 349, 330, 330, 294, // Like a diamond in the sky
+        262, 262, 392, 392, 440, 440, 392, // Twinkle twinkle little star
+        349, 349, 330, 330, 294, 294, 262  // How I wonder what you are
+      ]
+    },
+    {
+      name: "Mary Had a Little Lamb",
+      // E D C D E E E D D D E G G E D C D E E E E D D E D C
+      notes: [
+        330, 294, 262, 294, 330, 330, 330, // Mary had a little lamb
+        294, 294, 294, // little lamb
+        330, 392, 392, // little lamb
+        330, 294, 262, 294, 330, 330, 330, 330, // Mary had a little lamb its
+        294, 294, 330, 294, 262 // fleece was white as snow
+      ]
+    },
+    {
+      name: "Für Elise",
+      // E D# E D# E B D C A
+      notes: [
+        330, 311, 330, 311, 330, 247, 294, 262, 220, // Opening phrase
+        262, 330, 220, 247, // Second phrase
+        247, 330, 247, 330, 311, 330, 247, 294, 262, 220, // Repeat
+        262, 330, 220, 247, // End phrase
+        247, 294, 247, 330, 392 // Extension
+      ]
+    },
+    {
+      name: "Greensleeves",
+      // A C D E F E D B G A B C B A G# A
+      notes: [
+        220, 262, 294, 330, 349, 330, 294, 247, 196, 220, 247, 262, // Alas my love
+        247, 220, 208, 220, // you do me wrong
+        262, 294, 330, 349, 330, 294, 247, 196, 220, 247, // to cast me off
+        262, 247, 220, 175, 220, // discourteously
+        262, 294, 330, 349, 392, 440, 392, 349 // Greensleeves...
+      ]
     }
+  ];
+
+  let currentSongIndex = 0;
+  let currentNoteIndex = 0;
+  let songTitleDisplay = null;
+
+  function initNewSong() {
+    currentSongIndex = Math.floor(Math.random() * songs.length);
+    currentNoteIndex = 0;
+    showSongTitle(songs[currentSongIndex].name);
+  }
+
+  function showSongTitle(title) {
+    // Remove old display if exists
+    if (songTitleDisplay) {
+      songTitleDisplay.remove();
+    }
+    
+    // Create new display
+    songTitleDisplay = document.createElement('div');
+    songTitleDisplay.style.cssText = `
+      position: fixed;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 100;
+      font: 900 48px system-ui;
+      color: rgba(255,255,255,0.95);
+      text-shadow: 0 4px 16px rgba(0,0,0,0.6), 0 0 30px rgba(140, 255, 210, 0.6);
+      text-align: center;
+      pointer-events: none;
+      opacity: 1;
+      transition: opacity 1s ease;
+    `;
+    songTitleDisplay.textContent = title;
+    document.body.appendChild(songTitleDisplay);
+    
+    // Fade out after 2 seconds
+    setTimeout(() => {
+      if (songTitleDisplay) {
+        songTitleDisplay.style.opacity = '0';
+        setTimeout(() => {
+          if (songTitleDisplay) {
+            songTitleDisplay.remove();
+            songTitleDisplay = null;
+          }
+        }, 1000);
+      }
+    }, 2000);
+  }
+
+  function playNextNote() {
+    if (!audioPrimed) return;
+    
+    const song = songs[currentSongIndex];
+    const frequency = song.notes[currentNoteIndex];
+    
+    // Play the note
+    playTone(frequency, 0.3, "sine", 0.15);
+    
+    // Move to next note
+    currentNoteIndex++;
+    
+    // If song finished, start a new random song
+    if (currentNoteIndex >= song.notes.length) {
+      initNewSong();
+    }
+  }
+
+  // Initialize first song
+  initNewSong();
+
+  // Different pop sounds - NOW UNUSED, REPLACED BY MUSICAL NOTES
+  function playPopSound(type) {
+    // This function is kept for compatibility but not used
+    playNextNote();
   }
 
   // ---------------- Bubble Types ----------------
