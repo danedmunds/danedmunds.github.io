@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Touchy Effects (v4)</title>
+  <title>Touchy Effects (v5)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -934,8 +934,9 @@ function spawnBubble(x,y,scale=1) {
   }
 
   // ---------------- Auto slider modulation ----------------
-  // Drifts values slowly, and “reacts” slightly to activity (particle count).
-  const modPhase = new Map(); // key -> phase
+  // Steps towards random target values within each slider's range
+  const sliderTargets = new Map(); // key -> { current, target, speed }
+  
   function modulateSliders(dt) {
     if (!autoSliders) return;
 
@@ -945,17 +946,36 @@ function spawnBubble(x,y,scale=1) {
 
     for (const s of effect.sliders) {
       const key = `${activeEffectId}:${s.key}`;
-      const ph = (modPhase.get(key) ?? rand(0, Math.PI*2)) + dt * (0.35 + activity*0.9);
-      modPhase.set(key, ph);
-
-      const amp = (s.mod ?? 0.12) * (1 + activity*0.6) * (s.max - s.min);
-      const center = params[s.key];
-      const drift = Math.sin(ph) * amp * 0.10;
-
-      // rare tiny nudges
-      const jitter = (Math.random() < dt * 0.25) ? rand(-1,1) * amp * 0.02 : 0;
-
-      params[s.key] = clamp(center + drift + jitter, s.min, s.max);
+      
+      // Get or initialize target data
+      let targetData = sliderTargets.get(key);
+      if (!targetData) {
+        targetData = {
+          current: params[s.key],
+          target: rand(s.min, s.max),
+          speed: (s.mod ?? 0.12) * (s.max - s.min) * (0.5 + activity * 0.5),
+        };
+        sliderTargets.set(key, targetData);
+      }
+      
+      // Update speed based on activity
+      targetData.speed = (s.mod ?? 0.12) * (s.max - s.min) * (0.5 + activity * 0.5);
+      
+      // Step towards target
+      const diff = targetData.target - targetData.current;
+      const step = targetData.speed * dt;
+      
+      if (Math.abs(diff) < step) {
+        // Reached target, choose new one
+        targetData.current = targetData.target;
+        targetData.target = rand(s.min, s.max);
+      } else {
+        // Move towards target
+        targetData.current += Math.sign(diff) * step;
+      }
+      
+      // Update parameter
+      params[s.key] = clamp(targetData.current, s.min, s.max);
     }
   }
 
