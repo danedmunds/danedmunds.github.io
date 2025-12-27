@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v15)</title>
+  <title>Bubble Pop! (v16)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -286,8 +286,8 @@
     const song = songs[currentSongIndex];
     const frequency = song.notes[currentNoteIndex];
     
-    // Play the note
-    playTone(frequency, 0.3, "sine", 0.15);
+    // Play the note LOUDER
+    playTone(frequency, 0.3, "sine", 0.35); // Increased from 0.15 to 0.35
     
     // Move to next note
     currentNoteIndex++;
@@ -391,12 +391,32 @@
     const r = rand(type.size[0], type.size[1]);
     const speed = rand(type.speed[0], type.speed[1]);
     
+    // 70% from bottom, 30% from sides
+    const spawnFromSide = Math.random() < 0.3;
+    
+    let x, y, vx, vy;
+    
+    if (spawnFromSide) {
+      // Spawn from left or right side
+      const fromLeft = Math.random() < 0.5;
+      x = fromLeft ? -r - 10 : innerWidth + r + 10;
+      y = rand(innerHeight * 0.3, innerHeight - r - 20); // Middle to bottom
+      vx = fromLeft ? rand(1.5, 3.0) : rand(-3.0, -1.5); // Blow across screen
+      vy = rand(-1.5, -0.5); // Float upward gently
+    } else {
+      // Spawn from bottom (original)
+      x = rand(r + 20, innerWidth - r - 20);
+      y = innerHeight + r + 10;
+      vx = rand(-0.3, 0.3);
+      vy = -speed;
+    }
+    
     state.bubbles.push({
-      x: rand(r + 20, innerWidth - r - 20),
-      y: innerHeight + r + 10,
+      x,
+      y,
       r,
-      vy: -speed,
-      vx: rand(-0.3, 0.3),
+      vy,
+      vx,
       life: 1.0,
       phase: rand(0, Math.PI*2),
       wiggleSpeed: rand(0.5, 2.0),
@@ -1280,9 +1300,9 @@
 
   // ---------------- Bubble Spawner ----------------
   let spawnTimer = 0;
-  const BASE_SPAWN_INTERVAL = 0.8;
-  const MAX_BUBBLES = 15; // Maximum comfortable bubble count
-  const CROWDED_THRESHOLD = 12; // Start slowing down here
+  const BASE_SPAWN_INTERVAL = 0.4; // Faster spawn! (was 0.8)
+  const MAX_BUBBLES = 20; // Allow more bubbles (was 15)
+  const CROWDED_THRESHOLD = 16; // Start slowing down here (was 12)
 
   function spawnLoop(dt) {
     const bubbleCount = state.bubbles.length;
