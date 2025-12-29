@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v20)</title>
+  <title>Bubble Pop! (v21)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -92,6 +92,7 @@
     bubbles: [],
     particles: [],
     chainDisplays: [], // Active chain reaction displays
+    noteEffectParticles: [], // Particles for note visual effects
   };
   
   let activeChains = new Map(); // chainId -> { count, displayIndex, originX, originY }
@@ -234,10 +235,34 @@
   let currentSongIndex = 0;
   let currentNoteIndex = 0;
   let songTitleDisplay = null;
+  
+  // Visual effects for notes
+  let currentEffectIndex = 0;
+  const noteEffects = [
+    "bounce",
+    "wobble", 
+    "growPulse",
+    "spinning",
+    "sparkleBurst",
+    "confettiPop",
+    "bubbleTrail",
+    "rainbowTrail",
+    "pulsingGlow",
+    "colorWave",
+    "shimmer",
+    "lightBeam",
+    "bouncingSparkles",
+    "growingGlow",
+    "rainbowSpiral"
+  ];
 
   function initNewSong() {
     currentSongIndex = Math.floor(Math.random() * songs.length);
     currentNoteIndex = 0;
+    
+    // Pick a random effect for this song
+    currentEffectIndex = Math.floor(Math.random() * noteEffects.length);
+    
     showSongTitle(songs[currentSongIndex].name);
   }
 
@@ -292,7 +317,7 @@
     // Move to next note
     currentNoteIndex++;
     
-    // If song finished, start a new random song
+    // If song finished, start a new random song (with new random effect)
     if (currentNoteIndex >= song.notes.length) {
       initNewSong();
     }
@@ -1134,6 +1159,35 @@
         return (now - point.time) < 500;
       });
     }
+    
+    // Update note effect particles
+    for (let i = state.noteEffectParticles.length - 1; i >= 0; i--) {
+      const p = state.noteEffectParticles[i];
+      p.life -= dt;
+      
+      if (p.life <= 0) {
+        state.noteEffectParticles.splice(i, 1);
+        continue;
+      }
+      
+      // Update position
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      
+      // Apply gravity for some types
+      if (p.type === "confetti" || p.type === "bubble") {
+        p.vy += 100 * dt; // gravity
+      }
+      
+      // Update rotation
+      if (p.vr !== undefined) {
+        p.rot += p.vr * dt;
+      }
+      
+      // Slow down
+      p.vx *= (1 - 1.5 * dt);
+      p.vy *= (1 - 1.5 * dt);
+    }
   }
 
   // ---------------- Musical Staff Helper ----------------
@@ -1208,11 +1262,212 @@
       const isCurrent = (i === currentNoteIndex);
       const isPast = (i < currentNoteIndex);
       
+      // Apply visual effect to current note
+      let effectOffsetX = 0;
+      let effectOffsetY = 0;
+      let effectScale = 1;
+      let effectRotation = 0;
+      let effectAlpha = 1;
+      let effectColor = null;
+      
       if (isCurrent) {
-        // Current note - bright and pulsing
-        ctx.globalAlpha = 0.9 * pulse;
-        ctx.shadowBlur = 20;
+        const effect = noteEffects[currentEffectIndex];
+        const t = performance.now() * 0.001; // time in seconds
+        
+        switch(effect) {
+          case "bounce":
+            // Bounce up and down
+            effectOffsetY = Math.abs(Math.sin(t * 10)) * -15;
+            break;
+            
+          case "wobble":
+            // Wiggle side to side
+            effectOffsetX = Math.sin(t * 8) * 8;
+            break;
+            
+          case "growPulse":
+            // Scale bigger and smaller
+            effectScale = 1 + Math.sin(t * 8) * 0.5;
+            break;
+            
+          case "spinning":
+            // Rotate
+            effectRotation = t * 4;
+            break;
+            
+          case "sparkleBurst":
+            // Spawn sparkle particles
+            if (Math.random() < 0.3) {
+              const angle = rand(0, Math.PI * 2);
+              const speed = rand(20, 50);
+              state.noteEffectParticles.push({
+                type: "star",
+                x: noteX,
+                y: noteY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: rand(0.3, 0.6),
+                maxLife: 0.6,
+                size: rand(2, 4),
+                hue: rand(0, 360),
+              });
+            }
+            effectScale = 1.2;
+            break;
+            
+          case "confettiPop":
+            // Spawn confetti particles
+            if (Math.random() < 0.2) {
+              const angle = rand(0, Math.PI * 2);
+              const speed = rand(15, 40);
+              state.noteEffectParticles.push({
+                type: "confetti",
+                x: noteX,
+                y: noteY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: rand(0.4, 0.8),
+                maxLife: 0.8,
+                size: rand(3, 6),
+                rot: rand(0, Math.PI * 2),
+                vr: rand(-10, 10),
+                hue: rand(0, 360),
+              });
+            }
+            effectScale = 1.3 + Math.sin(t * 15) * 0.2;
+            break;
+            
+          case "bubbleTrail":
+            // Spawn bubble particles
+            if (Math.random() < 0.25) {
+              state.noteEffectParticles.push({
+                type: "bubble",
+                x: noteX + rand(-5, 5),
+                y: noteY,
+                vx: rand(-5, 5),
+                vy: rand(-30, -50),
+                life: rand(0.5, 1.0),
+                maxLife: 1.0,
+                size: rand(3, 8),
+                hue: rand(180, 220),
+              });
+            }
+            break;
+            
+          case "rainbowTrail":
+            // Spawn rainbow trail particles
+            if (Math.random() < 0.4) {
+              state.noteEffectParticles.push({
+                type: "trail",
+                x: noteX + rand(-8, 8),
+                y: noteY + rand(-8, 8),
+                vx: rand(-10, 10),
+                vy: rand(-10, 10),
+                life: rand(0.3, 0.6),
+                maxLife: 0.6,
+                size: rand(2, 5),
+                hue: (t * 100) % 360,
+              });
+            }
+            effectColor = `hsl(${(t * 100) % 360}, 90%, 70%)`;
+            break;
+            
+          case "pulsingGlow":
+            // Pulsing glow effect
+            effectScale = 1 + Math.sin(t * 10) * 0.4;
+            effectAlpha = 0.7 + Math.sin(t * 10) * 0.3;
+            break;
+            
+          case "colorWave":
+            // Cycle through colors
+            effectColor = `hsl(${(t * 180) % 360}, 95%, 70%)`;
+            effectScale = 1.3;
+            break;
+            
+          case "shimmer":
+            // Glittery sparkle
+            effectAlpha = 0.6 + Math.random() * 0.4;
+            effectScale = 1.2 + Math.random() * 0.3;
+            break;
+            
+          case "lightBeam":
+            // Vertical beam (drawn separately below)
+            effectScale = 1.4;
+            // Draw beam
+            ctx.save();
+            ctx.globalAlpha = 0.3 * pulse;
+            const beamGradient = ctx.createLinearGradient(noteX, noteY, noteX, staffY - 50);
+            beamGradient.addColorStop(0, "rgba(140, 255, 210, 0.6)");
+            beamGradient.addColorStop(1, "rgba(140, 255, 210, 0)");
+            ctx.fillStyle = beamGradient;
+            ctx.fillRect(noteX - 10, staffY - 50, 20, noteY - (staffY - 50));
+            ctx.restore();
+            break;
+            
+          case "bouncingSparkles":
+            // Combine bounce + sparkles
+            effectOffsetY = Math.abs(Math.sin(t * 10)) * -15;
+            if (Math.random() < 0.3) {
+              const angle = rand(0, Math.PI * 2);
+              const speed = rand(20, 50);
+              state.noteEffectParticles.push({
+                type: "star",
+                x: noteX,
+                y: noteY + effectOffsetY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: rand(0.3, 0.6),
+                maxLife: 0.6,
+                size: rand(2, 4),
+                hue: rand(40, 80),
+              });
+            }
+            effectScale = 1.2;
+            break;
+            
+          case "growingGlow":
+            // Growing with glow ring
+            effectScale = 1 + Math.sin(t * 8) * 0.6;
+            // Draw glow ring
+            ctx.save();
+            ctx.globalAlpha = 0.4 * (1 - (effectScale - 1) / 0.6);
+            ctx.strokeStyle = `rgba(140, 255, 210, ${0.8 * (1 - (effectScale - 1) / 0.6)})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(noteX + effectOffsetX, noteY + effectOffsetY, 10 * effectScale, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+            break;
+            
+          case "rainbowSpiral":
+            // Colorful spiral particles
+            if (Math.random() < 0.3) {
+              const angle = t * 3;
+              const radius = (Math.sin(t * 5) + 1) * 15;
+              state.noteEffectParticles.push({
+                type: "spiral",
+                x: noteX + Math.cos(angle) * radius,
+                y: noteY + Math.sin(angle) * radius,
+                vx: Math.cos(angle) * 10,
+                vy: Math.sin(angle) * 10,
+                life: rand(0.4, 0.7),
+                maxLife: 0.7,
+                size: rand(2, 5),
+                hue: (angle * 50 + t * 100) % 360,
+              });
+            }
+            effectColor = `hsl(${(t * 150) % 360}, 95%, 70%)`;
+            break;
+        }
+        
+        // Apply effect transformations
+        ctx.save();
+        ctx.globalAlpha = 0.9 * pulse * effectAlpha;
+        ctx.shadowBlur = 20 * effectScale;
         ctx.shadowColor = "rgba(140, 255, 210, 0.8)";
+        ctx.translate(noteX + effectOffsetX, noteY + effectOffsetY);
+        ctx.rotate(effectRotation);
+        ctx.scale(effectScale, effectScale);
       } else if (isPast) {
         // Past notes - dimmed
         ctx.globalAlpha = 0.2;
@@ -1224,20 +1479,25 @@
       }
       
       // Draw note head (filled circle)
-      ctx.fillStyle = isCurrent ? "rgba(140, 255, 210, 1)" : 
+      const noteColor = effectColor || (isCurrent ? "rgba(140, 255, 210, 1)" : 
                       isPast ? "rgba(180, 180, 200, 0.6)" : 
-                      "rgba(255, 255, 255, 0.8)";
+                      "rgba(255, 255, 255, 0.8)");
+      ctx.fillStyle = noteColor;
       ctx.beginPath();
-      ctx.arc(noteX, noteY, 5, 0, Math.PI * 2);
+      ctx.arc(isCurrent ? 0 : noteX, isCurrent ? 0 : noteY, 5, 0, Math.PI * 2);
       ctx.fill();
       
       // Draw stem
-      ctx.strokeStyle = isCurrent ? "rgba(140, 255, 210, 1)" : ctx.fillStyle;
+      ctx.strokeStyle = isCurrent ? noteColor : ctx.fillStyle;
       ctx.lineWidth = isCurrent ? 2 : 1.5;
       ctx.beginPath();
-      ctx.moveTo(noteX + 5, noteY);
-      ctx.lineTo(noteX + 5, noteY - (isCurrent ? 30 : 25));
+      ctx.moveTo((isCurrent ? 0 : noteX) + 5, isCurrent ? 0 : noteY);
+      ctx.lineTo((isCurrent ? 0 : noteX) + 5, (isCurrent ? 0 : noteY) - (isCurrent ? 30 : 25));
       ctx.stroke();
+      
+      if (isCurrent) {
+        ctx.restore();
+      }
       
       // Draw ledger lines if note is outside staff
       if (noteY < staffY + lineSpacing || noteY > staffY + lineSpacing * 5) {
@@ -1255,6 +1515,48 @@
     }
     
     ctx.shadowBlur = 0;
+    ctx.restore();
+    
+    // Draw note effect particles
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const p of state.noteEffectParticles) {
+      const alpha = p.life / p.maxLife;
+      ctx.globalAlpha = alpha;
+      
+      if (p.type === "star") {
+        ctx.fillStyle = `hsl(${p.hue}, 95%, 75%)`;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const ang = (i / 5) * Math.PI * 2;
+          const r = i % 2 === 0 ? p.size : p.size * 0.4;
+          ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      } else if (p.type === "confetti") {
+        ctx.fillStyle = `hsl(${p.hue}, 90%, 65%)`;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillRect(-p.size / 2, -p.size, p.size, p.size * 2);
+        ctx.restore();
+      } else if (p.type === "bubble") {
+        ctx.strokeStyle = `hsla(${p.hue}, 80%, 65%, ${alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (p.type === "trail" || p.type === "spiral") {
+        ctx.fillStyle = `hsl(${p.hue}, 95%, 70%)`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
     ctx.restore();
   }
 
