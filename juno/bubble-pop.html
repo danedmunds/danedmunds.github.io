@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v17)</title>
+  <title>Bubble Pop! (v18)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -1059,11 +1059,136 @@
     }
   }
 
+  // ---------------- Musical Staff Helper ----------------
+  function getStaffPosition(frequency) {
+    // Map frequency to staff position (0 = middle C line, + goes up, - goes down)
+    // Each position is a half step (semitone)
+    const C4 = 262;
+    const semitones = Math.round(12 * Math.log2(frequency / C4));
+    return semitones;
+  }
+
+  function drawMusicalStaff() {
+    const song = songs[currentSongIndex];
+    const notes = song.notes;
+    
+    // Staff dimensions
+    const staffX = innerWidth * 0.1;
+    const staffY = 140;
+    const staffWidth = innerWidth * 0.8;
+    const staffHeight = 80;
+    const lineSpacing = staffHeight / 8; // 5 lines = 4 spaces, plus margins
+    
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    
+    // Draw staff lines (5 lines)
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 5; i++) {
+      const y = staffY + lineSpacing + i * lineSpacing;
+      ctx.beginPath();
+      ctx.moveTo(staffX, y);
+      ctx.lineTo(staffX + staffWidth, y);
+      ctx.stroke();
+    }
+    
+    // Calculate note spacing and pagination
+    const notesPerPage = 15; // Show 15 notes per page
+    const noteSpacing = staffWidth / (notesPerPage - 1);
+    
+    // Calculate which page we're on
+    const currentPage = Math.floor(currentNoteIndex / notesPerPage);
+    const startIdx = currentPage * notesPerPage;
+    const endIdx = Math.min(notes.length, startIdx + notesPerPage);
+    
+    // Position within current page
+    const positionInPage = currentNoteIndex - startIdx;
+    const playheadX = staffX + positionInPage * noteSpacing;
+    
+    // Draw playhead line
+    ctx.globalAlpha = 0.8;
+    const pulse = Math.sin(performance.now() * 0.01) * 0.2 + 0.8;
+    ctx.strokeStyle = `rgba(140, 255, 210, ${pulse})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(playheadX, staffY);
+    ctx.lineTo(playheadX, staffY + staffHeight);
+    ctx.stroke();
+    
+    // Draw notes for current page
+    for (let i = startIdx; i < endIdx; i++) {
+      const freq = notes[i];
+      const staffPos = getStaffPosition(freq);
+      
+      // Convert staff position to Y coordinate
+      // staffPos 0 (C4) = between 3rd and 4th line (space)
+      // Each staffPos = quarter of a lineSpacing (half step)
+      const noteY = staffY + lineSpacing * 3 - (staffPos * lineSpacing / 2);
+      const noteX = staffX + (i - startIdx) * noteSpacing;
+      
+      // Determine note state
+      const isCurrent = (i === currentNoteIndex);
+      const isPast = (i < currentNoteIndex);
+      
+      if (isCurrent) {
+        // Current note - bright and pulsing
+        ctx.globalAlpha = 0.9 * pulse;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = "rgba(140, 255, 210, 0.8)";
+      } else if (isPast) {
+        // Past notes - dimmed
+        ctx.globalAlpha = 0.2;
+        ctx.shadowBlur = 0;
+      } else {
+        // Future notes - medium brightness
+        ctx.globalAlpha = 0.5;
+        ctx.shadowBlur = 0;
+      }
+      
+      // Draw note head (filled circle)
+      ctx.fillStyle = isCurrent ? "rgba(140, 255, 210, 1)" : 
+                      isPast ? "rgba(180, 180, 200, 0.6)" : 
+                      "rgba(255, 255, 255, 0.8)";
+      ctx.beginPath();
+      ctx.arc(noteX, noteY, 5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Draw stem
+      ctx.strokeStyle = isCurrent ? "rgba(140, 255, 210, 1)" : ctx.fillStyle;
+      ctx.lineWidth = isCurrent ? 2 : 1.5;
+      ctx.beginPath();
+      ctx.moveTo(noteX + 5, noteY);
+      ctx.lineTo(noteX + 5, noteY - (isCurrent ? 30 : 25));
+      ctx.stroke();
+      
+      // Draw ledger lines if note is outside staff
+      if (noteY < staffY + lineSpacing || noteY > staffY + lineSpacing * 5) {
+        ctx.globalAlpha = 0.4;
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+        ctx.lineWidth = 1.5;
+        
+        // Determine which ledger lines to draw
+        const ledgerY = Math.round((noteY - (staffY + lineSpacing)) / lineSpacing) * lineSpacing + (staffY + lineSpacing);
+        ctx.beginPath();
+        ctx.moveTo(noteX - 8, ledgerY);
+        ctx.lineTo(noteX + 8, ledgerY);
+        ctx.stroke();
+      }
+    }
+    
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
   // ---------------- Draw ----------------
   function draw() {
     // Background
     ctx.fillStyle = "rgba(10, 5, 32, 0.15)";
     ctx.fillRect(0, 0, innerWidth, innerHeight);
+    
+    // Draw musical staff
+    drawMusicalStaff();
     
     // Draw drag trail
     if (dragTrail.length > 1) {
