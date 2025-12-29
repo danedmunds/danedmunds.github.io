@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v19)</title>
+  <title>Bubble Pop! (v20)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -286,8 +286,8 @@
     const song = songs[currentSongIndex];
     const frequency = song.notes[currentNoteIndex];
     
-    // Play the note LOUDER
-    playTone(frequency, 0.3, "sine", 0.35); // Increased from 0.15 to 0.35
+    // Play a musical note with proper envelope
+    playMusicalNote(frequency);
     
     // Move to next note
     currentNoteIndex++;
@@ -296,6 +296,48 @@
     if (currentNoteIndex >= song.notes.length) {
       initNewSong();
     }
+  }
+  
+  function playMusicalNote(freq) {
+    if (!audioPrimed) return;
+    const t0 = audioCtx.currentTime;
+    const duration = 0.5; // Longer note duration
+    
+    // Create oscillator for the note
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    // Use triangle wave for a mellower, more musical sound
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(freq, t0);
+    
+    // Musical envelope: Attack - Decay - Sustain - Release (ADSR)
+    const attackTime = 0.02;  // Quick attack
+    const decayTime = 0.08;   // Slight decay
+    const sustainLevel = 0.25; // Sustain volume
+    const releaseTime = 0.15;  // Gentle release
+    
+    // Start silent
+    gainNode.gain.setValueAtTime(0, t0);
+    
+    // Attack: ramp up quickly
+    gainNode.gain.linearRampToValueAtTime(0.35, t0 + attackTime);
+    
+    // Decay: drop to sustain level
+    gainNode.gain.linearRampToValueAtTime(sustainLevel, t0 + attackTime + decayTime);
+    
+    // Sustain: hold the level
+    gainNode.gain.setValueAtTime(sustainLevel, t0 + duration - releaseTime);
+    
+    // Release: fade out smoothly
+    gainNode.gain.linearRampToValueAtTime(0.0001, t0 + duration);
+    
+    // Connect and play
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    osc.start(t0);
+    osc.stop(t0 + duration);
   }
 
   // Initialize first song
