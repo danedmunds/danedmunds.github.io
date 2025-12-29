@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v22)</title>
+  <title>Bubble Pop! (v23)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -155,32 +155,61 @@
   // ---------------- Sound (Web Audio) ----------------
   let audioCtx = null;
   let audioPrimed = false;
+  let activeAudioNodes = 0; // Track active nodes
+  const MAX_AUDIO_NODES = 8; // Limit concurrent nodes for iOS
 
   function ensureAudio() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === "suspended") audioCtx.resume();
     audioPrimed = true;
   }
+  
+  // Periodically resume audio context (iOS fix)
+  setInterval(() => {
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+  }, 1000);
 
   function playTone(freq, dur=0.08, type="sine", vol=0.05) {
     if (!audioPrimed) return;
-    const t0 = audioCtx.currentTime;
+    if (activeAudioNodes >= MAX_AUDIO_NODES) return; // Don't create too many
+    
+    try {
+      // Resume if suspended
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      
+      const t0 = audioCtx.currentTime;
 
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
 
-    o.type = type;
-    o.frequency.setValueAtTime(freq, t0);
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t0);
 
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
 
-    o.connect(g);
-    g.connect(audioCtx.destination);
+      o.connect(g);
+      g.connect(audioCtx.destination);
 
-    o.start(t0);
-    o.stop(t0 + dur + 0.02);
+      activeAudioNodes++;
+      
+      o.start(t0);
+      o.stop(t0 + dur + 0.02);
+      
+      // Clean up when done
+      o.onended = () => {
+        activeAudioNodes--;
+        o.disconnect();
+        g.disconnect();
+      };
+    } catch (e) {
+      console.warn("Audio error:", e);
+    }
   }
 
   // ---------------- Musical Songs System ----------------
@@ -506,44 +535,68 @@
   
   function playMusicalNote(freq) {
     if (!audioPrimed) return;
-    const t0 = audioCtx.currentTime;
-    const duration = 0.5; // Longer note duration
+    if (activeAudioNodes >= MAX_AUDIO_NODES) return; // Don't create too many
     
-    // Create oscillator for the note
-    const osc = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    
-    // Use triangle wave for a mellower, more musical sound
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(freq, t0);
-    
-    // Musical envelope: Attack - Decay - Sustain - Release (ADSR)
-    const attackTime = 0.02;  // Quick attack
-    const decayTime = 0.08;   // Slight decay
-    const sustainLevel = 0.25; // Sustain volume
-    const releaseTime = 0.15;  // Gentle release
-    
-    // Start silent
-    gainNode.gain.setValueAtTime(0, t0);
-    
-    // Attack: ramp up quickly
-    gainNode.gain.linearRampToValueAtTime(0.35, t0 + attackTime);
-    
-    // Decay: drop to sustain level
-    gainNode.gain.linearRampToValueAtTime(sustainLevel, t0 + attackTime + decayTime);
-    
-    // Sustain: hold the level
-    gainNode.gain.setValueAtTime(sustainLevel, t0 + duration - releaseTime);
-    
-    // Release: fade out smoothly
-    gainNode.gain.linearRampToValueAtTime(0.0001, t0 + duration);
-    
-    // Connect and play
-    osc.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    
-    osc.start(t0);
-    osc.stop(t0 + duration);
+    try {
+      // Resume if suspended
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      
+      const t0 = audioCtx.currentTime;
+      const duration = 0.5; // Longer note duration
+      
+      // Create oscillator for the note
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      // Use triangle wave for a mellower, more musical sound
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, t0);
+      
+      // Musical envelope: Attack - Decay - Sustain - Release (ADSR)
+      const attackTime = 0.02;  // Quick attack
+      const decayTime = 0.08;   // Slight decay
+      const sustainLevel = 0.25; // Sustain volume
+      const releaseTime = 0.15;  // Gentle release
+      
+      // Start silent
+      gainNode.gain.setValueAtTime(0, t0);
+      
+      // Attack: ramp up quickly
+      gainNode.gain.linearRampToValueAtTime(0.35, t0 + attackTime);
+      
+      // Decay: drop to sustain level
+      gainNode.gain.linearRampToValueAtTime(sustainLevel, t0 + attackTime + decayTime);
+      
+      // Sustain: hold the level
+      gainNode.gain.setValueAtTime(sustainLevel, t0 + duration - releaseTime);
+      
+      // Release: fade out smoothly
+      gainNode.gain.linearRampToValueAtTime(0.0001, t0 + duration);
+      
+      // Connect and play
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      
+      activeAudioNodes++;
+      
+      osc.start(t0);
+      osc.stop(t0 + duration);
+      
+      // Clean up when done
+      osc.onended = () => {
+        activeAudioNodes--;
+        try {
+          osc.disconnect();
+          gainNode.disconnect();
+        } catch (e) {
+          // Already disconnected
+        }
+      };
+    } catch (e) {
+      console.warn("Audio error:", e);
+    }
   }
 
   // Initialize first song
@@ -1084,6 +1137,11 @@
   let dragTrail = [];
 
   function handlePointerDown(e) {
+    // Always try to resume audio context on user interaction (iOS requirement)
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    
     if (!audioPrimed) {
       ensureAudio();
       playPopSound(0);
