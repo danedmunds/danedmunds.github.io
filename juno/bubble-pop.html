@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v24)</title>
+  <title>Bubble Pop! (v25)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -2342,9 +2342,9 @@
 
   // ---------------- Bubble Spawner ----------------
   let spawnTimer = 0;
-  const BASE_SPAWN_INTERVAL = 0.4; // Faster spawn! (was 0.8)
-  const MAX_BUBBLES = 20; // Allow more bubbles (was 15)
-  const CROWDED_THRESHOLD = 16; // Start slowing down here (was 12)
+  const BASE_SPAWN_INTERVAL = 0.25; // Even faster! (was 0.4)
+  const MAX_BUBBLES = 30; // Many more bubbles! (was 20)
+  const CROWDED_THRESHOLD = 24; // Higher threshold (was 16)
 
   function spawnLoop(dt) {
     const bubbleCount = state.bubbles.length;
