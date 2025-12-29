@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v18)</title>
+  <title>Bubble Pop! (v19)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -526,8 +526,13 @@
         // Create a unique chain ID for this Giant bubble's chain reaction
         const chainId = Symbol();
         
-        // Create initial chain display at origin
-        createChainDisplay(x, y, 0, chainId);
+        // Track this chain (but don't create display yet - wait for first hit)
+        activeChains.set(chainId, {
+          count: 0,
+          displayIndex: -1,
+          originX: x,
+          originY: y,
+        });
         
         // Create shockwave rings that can pop other bubbles
         for (let i=0; i<5; i++) {
@@ -826,9 +831,8 @@
     }, 1500);
   }
 
-  // ---------------- Input Handling ----------------
-  let isDragging = false;
-  let lastDragCheck = { x: 0, y: 0 };
+  // ---------------- Input Handling (Multi-touch support) ----------------
+  let activePointers = new Map(); // pointerId -> { x, y, lastX, lastY }
   let dragTrail = [];
 
   function handlePointerDown(e) {
@@ -839,48 +843,61 @@
 
     const x = e.clientX;
     const y = e.clientY;
+    const pointerId = e.pointerId;
     
-    isDragging = true;
-    lastDragCheck = { x, y };
+    // Track this pointer
+    activePointers.set(pointerId, {
+      x: x,
+      y: y,
+      lastX: x,
+      lastY: y
+    });
     
-    // Start new trail
-    dragTrail = [{ x: x, y: y, time: performance.now() }];
+    // Add to trail
+    dragTrail.push({ x: x, y: y, time: performance.now() });
 
     // Check for bubble hit
     checkBubbleHit(x, y);
   }
 
   function handlePointerMove(e) {
-    if (!isDragging) return;
+    const pointerId = e.pointerId;
+    if (!activePointers.has(pointerId)) return;
     
     const x = e.clientX;
     const y = e.clientY;
+    const pointer = activePointers.get(pointerId);
     
     // Add to trail
     dragTrail.push({ x: x, y: y, time: performance.now() });
-    if (dragTrail.length > 30) {
+    if (dragTrail.length > 60) { // Increased for multi-finger trails
       dragTrail.shift();
     }
     
     // Check for bubbles along the drag path
-    const dx = x - lastDragCheck.x;
-    const dy = y - lastDragCheck.y;
+    const dx = x - pointer.lastX;
+    const dy = y - pointer.lastY;
     const dist = Math.hypot(dx, dy);
     
     // Check multiple points along the drag path
     const steps = Math.max(1, Math.floor(dist / 10));
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
-      const checkX = lastDragCheck.x + dx * t;
-      const checkY = lastDragCheck.y + dy * t;
+      const checkX = pointer.lastX + dx * t;
+      const checkY = pointer.lastY + dy * t;
       checkBubbleHit(checkX, checkY);
     }
     
-    lastDragCheck = { x, y };
+    // Update pointer position
+    pointer.lastX = x;
+    pointer.lastY = y;
+    pointer.x = x;
+    pointer.y = y;
   }
 
   function handlePointerUp(e) {
-    isDragging = false;
+    const pointerId = e.pointerId;
+    activePointers.delete(pointerId);
   }
 
   function checkBubbleHit(x, y) {
@@ -896,6 +913,7 @@
         const pointsEarned = b.type.points * Math.max(1, combo);
         updateScore(pointsEarned);
         state.bubbles.splice(i, 1);
+        return; // Only pop one bubble per hit check
       }
     }
   }
@@ -954,10 +972,27 @@
                 const chainData = activeChains.get(chainId);
                 if (chainData) {
                   chainData.count++;
-                  // Update the existing display
-                  if (state.chainDisplays[chainData.displayIndex]) {
-                    state.chainDisplays[chainData.displayIndex].count = chainData.count;
-                    state.chainDisplays[chainData.displayIndex].life = 1.5; // Reset life
+                  
+                  // Create display on first hit, update on subsequent hits
+                  if (chainData.displayIndex === -1) {
+                    // First hit - create the display!
+                    const displayIndex = state.chainDisplays.length;
+                    state.chainDisplays.push({
+                      x: chainData.originX,
+                      y: chainData.originY - 20,
+                      count: chainData.count,
+                      life: 1.5,
+                      scale: 0.5,
+                      maxScale: 1.5 + chainData.count * 0.2,
+                      vy: -50,
+                    });
+                    chainData.displayIndex = displayIndex;
+                  } else {
+                    // Update the existing display
+                    if (state.chainDisplays[chainData.displayIndex]) {
+                      state.chainDisplays[chainData.displayIndex].count = chainData.count;
+                      state.chainDisplays[chainData.displayIndex].life = 1.5; // Reset life
+                    }
                   }
                 }
               }
@@ -1051,7 +1086,7 @@
     }
     
     // Clean up old trail points
-    if (!isDragging && dragTrail.length > 0) {
+    if (activePointers.size === 0 && dragTrail.length > 0) {
       var now = performance.now();
       dragTrail = dragTrail.filter(function(point) {
         return (now - point.time) < 500;
@@ -1235,7 +1270,7 @@
         }
       }
       
-      if (isDragging && dragTrail.length > 0) {
+      if (activePointers.size > 0 && dragTrail.length > 0) {
         var latest = dragTrail[dragTrail.length - 1];
         if (Math.random() < 0.4) {
           var hue = (latest.x * 0.3 + latest.y * 0.2 + trailNow * 0.1) % 360;
