@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v29)</title>
+  <title>Bubble Pop! (v31)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -445,7 +445,7 @@
   let currentSongIndex = 0;
   let currentNoteIndex = 0;
   let lastNoteTime = 0; // Track when last note was played
-  const MIN_NOTE_INTERVAL = 100; // Minimum 100ms between notes (max 10 notes/sec)
+  const MIN_NOTE_INTERVAL = 250; // Minimum 250ms between notes (max 4 notes/sec)
   let songTitleDisplay = null;
   
   // Visual effects for notes
@@ -755,6 +755,56 @@
       hue,
       type,
     });
+  }
+
+  // Burst spawn - quick push from center and sides when screen is sparse
+  function burstSpawn() {
+    const burstCount = 12; // Spawn 12 bubbles in burst
+    
+    for (let i = 0; i < burstCount; i++) {
+      const type = getRandomBubbleType();
+      const hue = rand(type.color[0], type.color[1]);
+      const r = rand(type.size[0], type.size[1]);
+      
+      let x, y, vx, vy;
+      const spawnLocation = Math.random();
+      
+      if (spawnLocation < 0.33) {
+        // From center bottom - shoot upward fast
+        x = innerWidth / 2 + rand(-100, 100);
+        y = innerHeight + r + 10;
+        vx = rand(-2, 2);
+        vy = rand(-15, -10); // Fast upward!
+      } else if (spawnLocation < 0.66) {
+        // From left side - shoot right
+        x = -r - 10;
+        y = rand(innerHeight * 0.2, innerHeight * 0.8);
+        vx = rand(12, 18); // Fast horizontal!
+        vy = rand(-2, 2);
+      } else {
+        // From right side - shoot left
+        x = innerWidth + r + 10;
+        y = rand(innerHeight * 0.2, innerHeight * 0.8);
+        vx = rand(-18, -12); // Fast horizontal!
+        vy = rand(-2, 2);
+      }
+      
+      state.bubbles.push({
+        x,
+        y,
+        r,
+        vy,
+        vx,
+        life: 1.0,
+        phase: rand(0, Math.PI*2),
+        wiggleSpeed: rand(0.5, 2.0),
+        wiggleAmp: rand(0.5, 2.0),
+        hue,
+        type,
+        isBurst: true, // Flag for deceleration
+        burstAge: 0, // Track time since burst spawn
+      });
+    }
   }
 
   // ---------------- Explosion Types ----------------
@@ -1452,6 +1502,30 @@
     for (let i = state.bubbles.length - 1; i >= 0; i--) {
       const b = state.bubbles[i];
       b.phase += dt * b.wiggleSpeed;
+      
+      // Burst bubbles decelerate quickly to normal speed
+      if (b.isBurst) {
+        b.burstAge += dt;
+        const decelTime = 1.0; // Decelerate over 1 second
+        if (b.burstAge < decelTime) {
+          // Exponential deceleration curve (fast -> slow)
+          const decelFactor = Math.pow(1 - (b.burstAge / decelTime), 2);
+          const targetSpeed = b.type.speed[1]; // Target normal speed
+          
+          // Smoothly reduce velocity magnitude while maintaining direction
+          const currentSpeed = Math.hypot(b.vx, b.vy);
+          if (currentSpeed > targetSpeed) {
+            const newSpeed = lerp(targetSpeed, currentSpeed, decelFactor);
+            const ratio = newSpeed / currentSpeed;
+            b.vx *= ratio;
+            b.vy *= ratio;
+          }
+        } else {
+          // After deceleration, behave like normal bubble
+          b.isBurst = false;
+        }
+      }
+      
       b.x += (b.vx + Math.sin(b.phase) * b.wiggleAmp) * 60 * dt;
       b.y += b.vy * 60 * dt;
 
@@ -2772,9 +2846,20 @@
   const BASE_SPAWN_INTERVAL = 0.25; // Even faster! (was 0.4)
   const MAX_BUBBLES = 30; // Many more bubbles! (was 20)
   const CROWDED_THRESHOLD = 24; // Higher threshold (was 16)
+  const LOW_BUBBLE_THRESHOLD = 8; // Trigger burst when below this
+  let lastBurstTime = 0;
+  const BURST_COOLDOWN = 3000; // 3 seconds between bursts
 
   function spawnLoop(dt) {
     const bubbleCount = state.bubbles.length;
+    
+    // BURST SPAWN: When screen is sparse, do a big fast push!
+    const now = performance.now();
+    if (bubbleCount < LOW_BUBBLE_THRESHOLD && now - lastBurstTime > BURST_COOLDOWN) {
+      lastBurstTime = now;
+      burstSpawn();
+      return; // Skip normal spawning this frame
+    }
     
     // Calculate density penalty
     let densityMultiplier = 1.0;
