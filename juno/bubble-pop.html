@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v27)</title>
+  <title>Bubble Pop! (v29)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -444,6 +444,8 @@
 
   let currentSongIndex = 0;
   let currentNoteIndex = 0;
+  let lastNoteTime = 0; // Track when last note was played
+  const MIN_NOTE_INTERVAL = 100; // Minimum 100ms between notes (max 10 notes/sec)
   let songTitleDisplay = null;
   
   // Visual effects for notes
@@ -517,6 +519,14 @@
 
   function playNextNote() {
     if (!audioPrimed) return;
+    
+    // Throttle note playing to prevent song from going too fast during chain reactions
+    const now = performance.now();
+    if (now - lastNoteTime < MIN_NOTE_INTERVAL) {
+      // Too soon! Ignore this pop event
+      return;
+    }
+    lastNoteTime = now;
     
     const song = songs[currentSongIndex];
     const frequency = song.notes[currentNoteIndex];
