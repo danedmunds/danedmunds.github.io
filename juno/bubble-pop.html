@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Bubble Pop! (v25)</title>
+  <title>Bubble Pop! (v27)</title>
   <style>
     html, body {
       margin: 0; height: 100%;
@@ -683,6 +683,16 @@
       weight: 5,
       hasStars: true // Visual indicator
     },
+    { 
+      name: "Zipper", 
+      color: [280, 320], // purple/magenta
+      size: [40, 60],
+      speed: [0.7, 1.3],
+      points: 50,
+      explosionType: 8,
+      weight: 5,
+      hasZipper: true // Visual indicator - horizontal lines
+    },
   ];
 
   function getRandomBubbleType() {
@@ -1147,6 +1157,129 @@
           });
         }
         break;
+        
+      case 8: // ZIPPER - Folds into itself then explodes horizontally!
+        // Create imploding fold-in particles
+        const foldParticles = 80;
+        for (let i = 0; i < foldParticles; i++) {
+          const angle = rand(0, Math.PI * 2);
+          const distance = rand(r * 0.3, r);
+          const startX = x + Math.cos(angle) * distance;
+          const startY = y + Math.sin(angle) * distance;
+          
+          state.particles.push({
+            kind: "zipperFold",
+            x: startX,
+            y: startY,
+            vx: 0,
+            vy: 0,
+            r: rand(2, 6),
+            life: 0.4, // Fast fold-in
+            maxLife: 0.4,
+            hue: hue + rand(-30, 30),
+            gravity: 0,
+            originX: x,
+            originY: y,
+            startX: startX,
+            startY: startY,
+          });
+        }
+        
+        // After fold-in, create horizontal explosion
+        setTimeout(() => {
+          const explosionWidth = r * 3.5; // 3-4 times radius
+          const explosionHeight = r * 0.8;
+          
+          // Left and right explosive waves
+          const particlesPerSide = 40;
+          
+          // Right side explosion
+          for (let i = 0; i < particlesPerSide; i++) {
+            const progress = i / particlesPerSide;
+            const speed = rand(8, 15);
+            const spread = rand(-0.3, 0.3); // Small vertical spread
+            
+            state.particles.push({
+              kind: "zipperBlast",
+              x, y,
+              vx: speed,
+              vy: speed * spread,
+              r: rand(3, 8),
+              life: 0.8,
+              maxLife: 0.8,
+              hue: hue + rand(-40, 40),
+              gravity: 0.2,
+              phase: progress * Math.PI * 2,
+              isZipperBlast: true, // Flag for collision
+              maxDistance: explosionWidth,
+            });
+          }
+          
+          // Left side explosion
+          for (let i = 0; i < particlesPerSide; i++) {
+            const progress = i / particlesPerSide;
+            const speed = rand(8, 15);
+            const spread = rand(-0.3, 0.3);
+            
+            state.particles.push({
+              kind: "zipperBlast",
+              x, y,
+              vx: -speed,
+              vy: speed * spread,
+              r: rand(3, 8),
+              life: 0.8,
+              maxLife: 0.8,
+              hue: hue + rand(-40, 40),
+              gravity: 0.2,
+              phase: progress * Math.PI * 2,
+              isZipperBlast: true,
+              maxDistance: explosionWidth,
+            });
+          }
+          
+          // Central horizontal beam effect
+          const beamSegments = 30;
+          for (let side = -1; side <= 1; side += 2) {
+            for (let i = 0; i < beamSegments; i++) {
+              const progress = i / beamSegments;
+              const offsetX = progress * explosionWidth * side;
+              
+              state.particles.push({
+                kind: "zipperBeam",
+                x: x + offsetX,
+                y: y,
+                vx: side * rand(10, 20),
+                vy: 0,
+                width: explosionWidth / beamSegments * 1.5,
+                height: explosionHeight,
+                life: 0.6,
+                maxLife: 0.6,
+                hue: hue + i * 8,
+                phase: i * 0.2,
+                delay: progress * 0.1, // Stagger appearance
+                isZipperBeam: true, // Flag for collision
+              });
+            }
+          }
+          
+          // Explosion flash
+          for (let i = 0; i < 50; i++) {
+            const angle = rand(0, Math.PI * 2);
+            const speed = rand(5, 12);
+            state.particles.push({
+              kind: "circle",
+              x, y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              r: rand(2, 6),
+              life: rand(0.3, 0.6),
+              hue: hue + rand(-80, 80),
+              gravity: 0.8,
+              fadeType: 2,
+            });
+          }
+        }, 400); // Wait for fold-in to complete
+        break;
     }
   }
 
@@ -1467,6 +1600,119 @@
           if (p.x < -margin || p.x > innerWidth + margin || 
               p.y < -margin || p.y > innerHeight + margin) {
             p.life = 0; // Remove it
+          }
+        }
+        
+        // Zipper fold-in particles implode to center
+        if (p.kind === "zipperFold") {
+          const lifeProg = 1 - (p.life / p.maxLife);
+          // Accelerate toward origin with increasing force
+          const pullStrength = lifeProg * lifeProg * 50; // Exponential acceleration
+          const dx = p.originX - p.x;
+          const dy = p.originY - p.y;
+          const dist = Math.hypot(dx, dy);
+          
+          if (dist > 1) {
+            p.vx = (dx / dist) * pullStrength;
+            p.vy = (dy / dist) * pullStrength;
+          }
+          
+          // Shrink as it approaches center
+          p.r *= 0.95;
+        }
+        
+        // Zipper blast particles (horizontal explosion)
+        if (p.kind === "zipperBlast") {
+          p.phase += dt * 8;
+          
+          // Check for bubble collisions (only once per particle)
+          if (p.isZipperBlast && p.life > 0.1) {
+            for (let j = state.bubbles.length - 1; j >= 0; j--) {
+              const b = state.bubbles[j];
+              const dx = p.x - b.x;
+              const dy = p.y - b.y;
+              const dist = Math.hypot(dx, dy);
+              
+              if (dist < p.r + b.r) {
+                // Pop the bubble!
+                explodeBubble(b);
+                const pointsEarned = b.type.points;
+                updateScore(pointsEarned);
+                state.bubbles.splice(j, 1);
+                
+                // Impact sparkles
+                for (let k = 0; k < 10; k++) {
+                  const angle = rand(0, Math.PI * 2);
+                  const speed = rand(2, 6);
+                  state.particles.push({
+                    kind: "circle",
+                    x: b.x,
+                    y: b.y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    r: rand(2, 4),
+                    life: rand(0.2, 0.4),
+                    hue: p.hue,
+                    gravity: 0.5,
+                    fadeType: 2,
+                  });
+                }
+                
+                // Mark this particle as done checking
+                p.isZipperBlast = false;
+                p.life = Math.min(p.life, 0.3); // Fade out quickly
+                break;
+              }
+            }
+          }
+        }
+        
+        // Zipper beam segments (visual effect with collision)
+        if (p.kind === "zipperBeam") {
+          p.phase += dt * 12;
+          
+          // Check for bubble collisions (only once per beam segment)
+          if (p.isZipperBeam && p.life < p.maxLife - (p.delay || 0) && p.life > 0.2) {
+            for (let j = state.bubbles.length - 1; j >= 0; j--) {
+              const b = state.bubbles[j];
+              
+              // Check if bubble intersects beam rectangle
+              const distX = Math.abs(b.x - p.x);
+              const distY = Math.abs(b.y - p.y);
+              
+              if (distX < p.width / 2 + b.r && distY < p.height / 2 + b.r) {
+                // Pop the bubble!
+                explodeBubble(b);
+                const pointsEarned = b.type.points;
+                updateScore(pointsEarned);
+                state.bubbles.splice(j, 1);
+                
+                // Beam hit effect
+                for (let k = 0; k < 8; k++) {
+                  const angle = rand(0, Math.PI * 2);
+                  const speed = rand(3, 8);
+                  state.particles.push({
+                    kind: "star",
+                    x: b.x,
+                    y: b.y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: rand(3, 6),
+                    rot: rand(0, Math.PI * 2),
+                    vr: rand(-15, 15),
+                    twinkle: rand(0, Math.PI * 2),
+                    life: rand(0.3, 0.5),
+                    hue: p.hue + 60,
+                    gravity: 0.3,
+                    fadeType: 1,
+                  });
+                }
+                
+                // Mark this beam segment as done
+                p.isZipperBeam = false;
+                break;
+              }
+            }
           }
         }
         
@@ -2205,6 +2451,124 @@
           ctx.globalAlpha = a * 0.3;
         }
       }
+      else if (p.kind === "zipperFold") {
+        // Particles imploding to center
+        const a = clamp(p.life / p.maxLife, 0, 1);
+        const lifeProg = 1 - a;
+        
+        // Glow trail as it accelerates inward
+        ctx.globalAlpha = a * 0.4;
+        const trailGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 3);
+        trailGrad.addColorStop(0, `hsla(${p.hue}, 100%, 75%, 0.8)`);
+        trailGrad.addColorStop(1, `hsla(${p.hue}, 100%, 75%, 0)`);
+        ctx.fillStyle = trailGrad;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Main particle
+        ctx.globalAlpha = a;
+        ctx.fillStyle = `hsl(${p.hue}, 100%, 70%)`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bright core
+        ctx.globalAlpha = a * 0.8;
+        ctx.fillStyle = `hsl(${p.hue + 30}, 100%, 90%)`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      else if (p.kind === "zipperBlast") {
+        // Horizontal explosion particles
+        const a = clamp(p.life / p.maxLife, 0, 1);
+        
+        // Pulsing effect
+        const pulse = 1 + Math.sin(p.phase) * 0.4;
+        const actualR = p.r * pulse;
+        
+        // Glow
+        ctx.globalAlpha = a * 0.3;
+        const glowGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, actualR * 2);
+        glowGrad.addColorStop(0, `hsla(${p.hue}, 100%, 70%, 0.6)`);
+        glowGrad.addColorStop(1, `hsla(${p.hue}, 100%, 70%, 0)`);
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, actualR * 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Main particle
+        ctx.globalAlpha = a;
+        ctx.fillStyle = `hsl(${p.hue}, 100%, 65%)`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, actualR, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bright center
+        ctx.globalAlpha = a * 0.8;
+        ctx.fillStyle = `hsl(${p.hue + 40}, 100%, 85%)`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, actualR * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      else if (p.kind === "zipperBeam") {
+        // Horizontal beam segment
+        const a = clamp(p.life / p.maxLife, 0, 1);
+        const lifeProg = 1 - a;
+        
+        // Don't draw until delay passes (skip this particle)
+        const delay = p.delay || 0;
+        if (p.life > p.maxLife - delay) {
+          // Skip drawing but continue to next particle
+        } else {
+          // Pulsing wave effect
+          const pulse = 1 + Math.sin(p.phase) * 0.5;
+          const actualHeight = p.height * pulse;
+          
+          // Core beam
+          ctx.globalAlpha = a * 0.7;
+          const beamGrad = ctx.createLinearGradient(
+            p.x - p.width / 2, p.y - actualHeight / 2,
+            p.x - p.width / 2, p.y + actualHeight / 2
+          );
+          beamGrad.addColorStop(0, `hsla(${p.hue}, 100%, 70%, 0.2)`);
+          beamGrad.addColorStop(0.5, `hsla(${p.hue}, 100%, 70%, 1)`);
+          beamGrad.addColorStop(1, `hsla(${p.hue}, 100%, 70%, 0.2)`);
+          ctx.fillStyle = beamGrad;
+          ctx.fillRect(
+            p.x - p.width / 2,
+            p.y - actualHeight / 2,
+            p.width,
+            actualHeight
+          );
+          
+          // Bright edges
+          ctx.globalAlpha = a * 0.9;
+          ctx.strokeStyle = `hsl(${p.hue + 60}, 100%, 85%)`;
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(p.x - p.width / 2, p.y);
+          ctx.lineTo(p.x + p.width / 2, p.y);
+          ctx.stroke();
+          
+          // Energy sparkles
+          const sparkleCount = 3;
+          for (let i = 0; i < sparkleCount; i++) {
+            const sparklePhase = p.phase + i * 2;
+            const sparkleX = p.x + Math.sin(sparklePhase) * p.width * 0.3;
+            const sparkleY = p.y + Math.cos(sparklePhase * 1.3) * actualHeight * 0.3;
+            const sparkleSize = 2 + Math.sin(sparklePhase * 2) * 1.5;
+            
+            ctx.globalAlpha = a * (0.4 + Math.sin(sparklePhase) * 0.4);
+            ctx.fillStyle = `hsl(${p.hue + i * 60}, 100%, 95%)`;
+            ctx.beginPath();
+            ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
     }
     ctx.restore();
 
@@ -2287,6 +2651,59 @@
           ctx.fill();
           ctx.restore();
         }
+        ctx.restore();
+      }
+      
+      // Draw single horizontally pulsing line inside zipper bubbles!
+      if (b.type && b.type.hasZipper) {
+        ctx.save();
+        
+        // Pulsing width effect
+        const pulse = Math.sin(now * 0.005) * 0.3 + 0.7; // Pulses between 0.4 and 1.0
+        const lineWidth = b.r * 1.4 * pulse;
+        
+        // Main line with gradient
+        ctx.globalAlpha = 0.9;
+        const lineGrad = ctx.createLinearGradient(
+          b.x - lineWidth/2, b.y,
+          b.x + lineWidth/2, b.y
+        );
+        lineGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0)`);
+        lineGrad.addColorStop(0.5, `hsla(${hue}, 100%, 70%, 1)`);
+        lineGrad.addColorStop(1, `hsla(${hue}, 100%, 70%, 0)`);
+        
+        ctx.strokeStyle = lineGrad;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(b.x - lineWidth/2, b.y);
+        ctx.lineTo(b.x + lineWidth/2, b.y);
+        ctx.stroke();
+        
+        // Bright center glow
+        ctx.globalAlpha = 0.8;
+        ctx.strokeStyle = `hsla(${hue + 60}, 100%, 85%, ${0.6 + pulse * 0.4})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(b.x - lineWidth/2, b.y);
+        ctx.lineTo(b.x + lineWidth/2, b.y);
+        ctx.stroke();
+        
+        // Moving energy dots along the line
+        const numDots = 5;
+        for (let i = 0; i < numDots; i++) {
+          const dotPhase = (now * 0.003 + i * 0.2) % 1;
+          const dotX = b.x + (dotPhase - 0.5) * lineWidth;
+          const dotSize = 2 + Math.sin(now * 0.01 + i) * 1;
+          const dotAlpha = Math.sin(dotPhase * Math.PI); // Fade in/out at edges
+          
+          ctx.globalAlpha = dotAlpha * 0.9;
+          ctx.fillStyle = `hsl(${hue + 180}, 100%, 90%)`;
+          ctx.beginPath();
+          ctx.arc(dotX, b.y, dotSize, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
         ctx.restore();
       }
     }
